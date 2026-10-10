@@ -115,7 +115,7 @@ export default function AppLayout({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2.5 min-h-[48px] rounded-lg text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-green-50 text-green-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -140,7 +140,7 @@ export default function AppLayout({
                       <Link
                         key={item.name}
                         href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-3 px-3 py-2.5 min-h-[48px] rounded-lg text-sm font-medium transition-colors ${
                           isActive
                             ? 'bg-green-50 text-green-700'
                             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -171,7 +171,7 @@ export default function AppLayout({
             <div className="mt-2 space-y-1">
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2 min-h-[48px] text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
                 <LogOut size={20} aria-hidden="true" />
                 Keluar

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Trash2, Edit2, MapPin, Calculator } from 'lucide-react'
+import { Trash2, Edit2, MapPin, Calculator, RotateCcw } from 'lucide-react'
 import { LahanWithPolygon } from './actions'
 
 function formatDateOnly(value: string): string {
@@ -28,6 +28,7 @@ export default function LahanList({ initialData = [] }: LahanListProps) {
 
   const fetchLahan = async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/lahan')
       if (!res.ok) throw new Error('Gagal memuat lahan')
@@ -78,10 +79,26 @@ export default function LahanList({ initialData = [] }: LahanListProps) {
 
   if (lahan.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-8 text-center">
-        <MapPin className="mx-auto text-gray-400 mb-3" size={48} />
-        <h3 className="text-lg font-medium text-gray-900 mb-1">Belum ada lahan</h3>
-        <p className="text-gray-500 mb-4">Tambahkan lahan pertama Anda dengan formulir di atas</p>
+      <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+        <MapPin className="mx-auto text-gray-300 mb-3" size={48} aria-hidden="true" />
+        <h3 className="text-lg font-medium text-gray-900 mb-1">Belum ada data lahan</h3>
+        <p className="text-gray-500 mb-4">
+          Anda belum mendaftarkan sawah. Tambahkan lahan pertama lewat formulir di atas.
+        </p>
+        {error && (
+          <>
+            <p className="text-sm text-red-600 mb-3" role="alert">
+              {error}
+            </p>
+            <button
+              onClick={fetchLahan}
+              className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <RotateCcw size={16} aria-hidden="true" />
+              Coba Lagi
+            </button>
+          </>
+        )}
       </div>
     )
   }

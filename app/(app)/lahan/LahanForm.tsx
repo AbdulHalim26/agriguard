@@ -273,7 +273,7 @@ export default function LahanForm() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+          className="w-full bg-green-600 text-white py-3 px-4 min-h-[48px] rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
           {submitting ? 'Menyimpan...' : 'Simpan Lahan'}
         </button>

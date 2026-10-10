@@ -143,7 +143,7 @@ export default function OnboardingPage() {
             <button
               type="submit"
               disabled={loading || !fullName.trim() || !inviteCode.trim()}
-              className="w-full py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-3 min-h-[48px] bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Menyimpan...' : 'Gabung & Masuk'}
             </button>
