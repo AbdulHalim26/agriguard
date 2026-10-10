@@ -9,9 +9,10 @@ import { getFloodStatus } from '@/app/(app)/dashboard/flood-actions'
 interface DashboardContentProps {
   userName: string
   userId: string
+  demoMode: boolean
 }
 
-export default function DashboardContent({ userName, userId }: DashboardContentProps) {
+export default function DashboardContent({ userName, userId, demoMode }: DashboardContentProps) {
   return (
     <div className="space-y-6">
       {/* Welcome header */}
@@ -75,21 +76,23 @@ export default function DashboardContent({ userName, userId }: DashboardContentP
         </Link>
       </div>
 
-      {/* Info banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-            <span className="text-blue-600 text-sm font-bold">i</span>
-          </div>
-          <div>
-            <h4 className="font-medium text-blue-800 mb-1">Mode Demo</h4>
-            <p className="text-blue-700 text-sm">
-              Aplikasi berjalan dalam mode demo dengan data simulasi. Data cuaca menggunakan fallback mock
-              jika API key tidak dikonfigurasi. Login dengan OTP: <code className="bg-white px-1.5 py-0.5 rounded text-xs font-mono">123456</code>
-            </p>
+      {/* Info banner: hanya saat OTP_MODE=mock (read dari server, dikirim sebagai prop) */}
+      {demoMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-blue-600 text-sm font-bold">i</span>
+            </div>
+            <div>
+              <h4 className="font-medium text-blue-800 mb-1">Mode Demo</h4>
+              <p className="text-blue-700 text-sm">
+                Aplikasi berjalan dalam mode demo dengan data simulasi. Data cuaca menggunakan fallback mock
+                jika API key tidak dikonfigurasi. Login dengan OTP: <code className="bg-white px-1.5 py-0.5 rounded text-xs font-mono">123456</code>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
