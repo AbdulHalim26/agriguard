@@ -13,6 +13,7 @@ import {
   FileText,
   Map,
   ShieldCheck,
+  History,
   LogOut,
   Menu,
   X,
@@ -30,6 +31,7 @@ const navigation = [
 
 const adminNavigation = [
   { name: 'Verifikasi', href: '/verifikasi', icon: ShieldCheck },
+  { name: 'Audit Trail', href: '/audit', icon: History },
 ]
 
 export default function AppLayout({
