@@ -47,7 +47,7 @@ insert into auth.users (
   is_sso_user
 )
 select
-  u.id,
+  u.id::uuid,
   '00000000-0000-0000-0000-000000000000',
   'authenticated',
   'authenticated',
@@ -87,7 +87,7 @@ with seed_users (id, phone, full_name, role, poktan_id) as (
 )
 insert into public.profiles (id, phone, full_name, role, poktan_id)
 select
-  u.id,
+  u.id::uuid,
   u.phone,
   u.full_name,
   u.role::user_role,
