@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Polygon, Marker, Tooltip, useMap } from 'react
 import * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PetaLahan, PetaReport } from './actions'
-import type { AiStatus } from '@/lib/recommendations'
+import { AI_STATUS_INFO, type AiStatus } from '@/lib/recommendations'
 
 const PIN_COLORS: Record<string, string> = {
   aman: '#16a34a',
@@ -91,7 +91,7 @@ export default function PetaMap({
           eventHandlers={{ click: () => onSelectReport(r) }}
         >
           <Tooltip>
-            {r.lahan_name || 'Lahan'} · {r.ai_status ?? 'manual'}
+            {r.lahan_name || 'Lahan'} · {r.ai_status ? AI_STATUS_INFO[r.ai_status].label : 'Manual'}
           </Tooltip>
         </Marker>
       ))}
