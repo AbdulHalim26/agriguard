@@ -130,6 +130,48 @@ export async function getPendingReportCount(): Promise<{ count: number; error: s
   return { count: count ?? 0, error: null }
 }
 
+export interface ReportStats {
+  total: number
+  pending: number
+  verified: number
+}
+
+export async function getReportStats(): Promise<{
+  data: ReportStats | null
+  error: string | null
+}> {
+  const supabase = createClient()
+
+  const { user, error: guardError } = await requirePplDinas(supabase)
+  if (!user) return { data: null, error: guardError }
+
+  // RLS membatasi cakupan: PPL -> poktan binaan, Dinas -> semua poktan.
+  const [totalRes, pendingRes, verifiedRes] = await Promise.all([
+    supabase.from('damage_reports').select('id', { count: 'exact', head: true }),
+    supabase
+      .from('damage_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_verified', false)
+      .is('verified_at', null),
+    supabase
+      .from('damage_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_verified', true),
+  ])
+
+  const firstError = totalRes.error || pendingRes.error || verifiedRes.error
+  if (firstError) return { data: null, error: firstError.message }
+
+  return {
+    data: {
+      total: totalRes.count ?? 0,
+      pending: pendingRes.count ?? 0,
+      verified: verifiedRes.count ?? 0,
+    },
+    error: null,
+  }
+}
+
 export async function setVerification(
   input: VerificationInput
 ): Promise<{ data: { id: string; is_verified: boolean } | null; error: string | null }> {

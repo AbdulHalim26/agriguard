@@ -8,8 +8,14 @@ import {
   AlertTriangle,
   AlertCircle,
   RotateCcw,
+  CloudRain,
+  Droplets,
 } from 'lucide-react'
 import { getFloodStatus, type FloodStatusData } from '@/app/(app)/dashboard/flood-actions'
+import {
+  RAIN_THRESHOLD_WASPADA_MM,
+  WATER_LEVEL_THRESHOLD_BAHAYA_M,
+} from '@/lib/thresholds'
 
 const HERO_BG: Record<string, string> = {
   green: 'from-[#2E7D32] to-[#43A047]',
@@ -23,7 +29,13 @@ const ICONS = {
   'alert-circle': AlertCircle,
 }
 
-export default function DashboardHero({ userName }: { userName: string }) {
+export default function DashboardHero({
+  userName,
+  showScanCta = true,
+}: {
+  userName: string
+  showScanCta?: boolean
+}) {
   const [data, setData] = useState<FloodStatusData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -51,15 +63,40 @@ export default function DashboardHero({ userName }: { userName: string }) {
       <div className="rounded-2xl bg-gradient-to-br from-[#2E7D32] to-[#43A047] p-6 sm:p-8 animate-pulse">
         <div className="h-5 w-40 bg-white/30 rounded mb-4" />
         <div className="h-10 w-56 bg-white/30 rounded mb-3" />
-        <div className="h-4 w-72 max-w-full bg-white/20 rounded" />
+        <div className="h-4 w-72 max-w-full bg-white/20 rounded mb-5" />
+        <div className="grid grid-cols-2 gap-3 max-w-sm">
+          <div className="h-16 bg-white/20 rounded-xl" />
+          <div className="h-16 bg-white/20 rounded-xl" />
+        </div>
       </div>
     )
   }
 
   const color = error || !data ? 'gray' : data.color
   const IconComponent = data ? ICONS[data.icon] : AlertCircle
-  const bgClass =
-    HERO_BG[color] ?? 'from-gray-500 to-gray-600'
+  const bgClass = HERO_BG[color] ?? 'from-gray-500 to-gray-600'
+
+  const rain = data?.rain_3h_mm ?? null
+  const water = data?.water_level_m ?? null
+  const rainWarn = rain !== null && rain >= RAIN_THRESHOLD_WASPADA_MM
+  const waterWarn = water !== null && water >= WATER_LEVEL_THRESHOLD_BAHAYA_M
+
+  const indicators = [
+    {
+      label: 'Curah Hujan 3 Jam',
+      value: rain !== null ? rain.toFixed(1) : '—',
+      unit: 'mm',
+      icon: CloudRain,
+      warn: rainWarn,
+    },
+    {
+      label: 'Tinggi Air Sungai',
+      value: water !== null ? water.toFixed(2) : '—',
+      unit: 'm',
+      icon: Droplets,
+      warn: waterWarn,
+    },
+  ]
 
   return (
     <div
@@ -89,14 +126,38 @@ export default function DashboardHero({ userName }: { userName: string }) {
           : data?.description}
       </p>
 
+      <div className="grid grid-cols-2 gap-3 max-w-sm mb-5">
+        {indicators.map((ind) => (
+          <div
+            key={ind.label}
+            className={`rounded-xl px-3 py-2.5 ${
+              ind.warn
+                ? 'bg-white/25 ring-1 ring-white/60'
+                : 'bg-white/10'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-[11px] text-white/80 mb-1">
+              <ind.icon size={13} aria-hidden="true" />
+              <span className="truncate">{ind.label}</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold">{ind.value}</span>
+              <span className="text-xs text-white/80">{ind.unit}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3">
-        <Link
-          href="/scan"
-          className="inline-flex items-center justify-center gap-2 min-h-[56px] px-5 py-3 bg-white text-[#2E7D32] font-bold rounded-xl hover:bg-green-50 active:scale-[0.99] transition-all text-sm sm:text-base text-center"
-        >
-          <Camera size={22} aria-hidden="true" />
-          SCAN KERUSAKAN SAWAH (AI)
-        </Link>
+        {showScanCta && (
+          <Link
+            href="/scan"
+            className="inline-flex items-center justify-center gap-2 min-h-[56px] px-5 py-3 bg-white text-[#2E7D32] font-bold rounded-xl hover:bg-green-50 active:scale-[0.99] transition-all text-sm sm:text-base text-center"
+          >
+            <Camera size={22} aria-hidden="true" />
+            SCAN KERUSAKAN SAWAH (AI)
+          </Link>
+        )}
 
         {error && (
           <button
