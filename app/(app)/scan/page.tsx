@@ -164,6 +164,11 @@ export default function ScanPage() {
 
   const selectedLahan = lahan.find((l) => l.id === selectedLahanId)
 
+  const inBounds =
+    selectedLahan && coords
+      ? validateGeofence(coords.lat, coords.lng, selectedLahan.polygon as Polygon)
+      : null
+
   const handleSubmit = useCallback(async () => {
     setSubmitError(null)
 
@@ -430,24 +435,26 @@ export default function ScanPage() {
                 : 'Belum ada lokasi. Gunakan GPS atau klik peta di bawah.'}
             </p>
             <div className="mt-3 overflow-hidden rounded-lg border border-gray-300">
-              <ScanMap coords={coords} onPick={setCoords} />
+              <ScanMap
+                coords={coords}
+                onPick={setCoords}
+                polygon={selectedLahan ? (selectedLahan.polygon as Polygon) : null}
+              />
             </div>
             <p className="mt-1 text-xs text-gray-400 flex items-center gap-1">
-              <MapPin size={12} aria-hidden="true" /> Klik peta untuk memilih titik lokasi (fallback jika GPS gagal).
+              <MapPin size={12} aria-hidden="true" /> Area hijau = batas lahan terpilih. Klik di dalamnya untuk memilih lokasi.
             </p>
           </div>
 
-          {selectedLahan && coords && (
+{selectedLahan && coords && (
             <div
               className={`text-sm px-3 py-2 rounded-lg ${
-validateGeofence(coords.lat, coords.lng, selectedLahan.polygon as Polygon)
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
+                inBounds ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
             >
-              {validateGeofence(coords.lat, coords.lng, selectedLahan.polygon as Polygon)
+              {inBounds
                 ? 'Lokasi berada di dalam batas lahan.'
-                : 'Lokasi di luar batas lahan — pindahkan titik ke dalam lahan.'}
+                : 'Lokasi di luar batas lahan — klik di dalam area hijau pada peta.'}
             </div>
           )}
 
@@ -460,13 +467,15 @@ validateGeofence(coords.lat, coords.lng, selectedLahan.polygon as Polygon)
 
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || inBounds === false}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
           >
             {submitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> Mengirim laporan...
               </>
+            ) : inBounds === false ? (
+              'Lokasi di luar lahan — pindahkan ke area hijau'
             ) : (
               <>
                 Kirim Laporan <ArrowRight className="w-5 h-5" aria-hidden="true" />
