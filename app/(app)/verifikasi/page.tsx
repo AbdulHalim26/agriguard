@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import VerifikasiContent from './VerifikasiContent'
 import OfflineFallback from '@/components/features/OfflineFallback'
 
+export const dynamic = 'force-dynamic'
+
 export default async function VerifikasiPage() {
   let userId: string | null = null
   let fullName: string | null = null
