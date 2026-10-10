@@ -8,15 +8,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // ===== Design tokens AgriGuard (M4) =====
+        primary: {
+          DEFAULT: '#2E7D32',
+          foreground: '#FFFFFF',
+        },
+        water: '#0288D1',
+        amber: { DEFAULT: '#ED6C02' },
+        red: { DEFAULT: '#D32F2F' },
+        surface: '#F8F9FA',
+        // ===== token shadcn/ui (dipakai globals.css) =====
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-        },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
@@ -44,7 +50,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-jakarta)', 'system-ui', 'sans-serif'],
       },
     },
   },

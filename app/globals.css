@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 17% 98%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 142 76% 36%;
-    --primary-foreground: 355.7 100% 97.3%;
+    --primary: 123 46% 34%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -22,8 +22,15 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 142 76% 36%;
+    --ring: 123 46% 34%;
     --radius: 0.75rem;
+
+    /* Design tokens AgriGuard */
+    --brand-primary: #2e7d32;
+    --brand-water: #0288d1;
+    --brand-amber: #ed6c02;
+    --brand-red: #d32f2f;
+    --brand-surface: #f8f9fa;
   }
 }
 
