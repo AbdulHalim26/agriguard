@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { Camera, MapPin, FileText, Plus } from 'lucide-react'
 import FloodStatusCard from '@/components/features/FloodStatusCard'
 import SyncWidget from '@/components/features/SyncWidget'
-import { getFloodStatus } from '@/app/(app)/dashboard/flood-actions'
+import DashboardHero from './DashboardHero'
+import ReportSummary from './ReportSummary'
 
 interface DashboardContentProps {
   userName: string
@@ -15,18 +16,16 @@ interface DashboardContentProps {
 export default function DashboardContent({ userName, userId, demoMode }: DashboardContentProps) {
   return (
     <div className="space-y-6">
-      {/* Welcome header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Selamat datang, {userName}!</h1>
-          <p className="text-gray-500 mt-1">Pantau kondisi sawah Anda secara real-time</p>
-        </div>
-      </div>
+      {/* Hero status banjir + CTA scan (FR-01 / FR-02) */}
+      <DashboardHero userName={userName} />
 
       {/* Widget antrian offline (FR-03) */}
       <SyncWidget userId={userId} />
 
-      {/* Flood Status Card - FR-01 */}
+      {/* Ringkasan laporan + status verifikasi */}
+      <ReportSummary userId={userId} />
+
+      {/* Flood Status Card - FR-01 (metrik detail) */}
       <FloodStatusCard />
 
       {/* Quick Actions */}
