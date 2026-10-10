@@ -1,0 +1,218 @@
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextRequest, NextResponse } from 'next/server'
+import { calculateSha256 } from '@/lib/geo'
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const admin = createAdminClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Tidak terautentikasi' },
+        { status: 401 }
+      )
+    }
+
+    const formData = await request.formData()
+    const idempotencyKey = formData.get('idempotency_key') as string
+    const userId = formData.get('user_id') as string
+    const lahanId = formData.get('lahan_id') as string
+    const latitude = parseFloat(formData.get('latitude') as string)
+    const longitude = parseFloat(formData.get('longitude') as string)
+    const clientCreatedAt = formData.get('client_created_at') as string
+    const aiStatus = formData.get('ai_status') as 'aman' | 'rusak_ringan' | 'rusak_berat' | null
+    const aiConfidence = formData.get('ai_confidence') ? parseFloat(formData.get('ai_confidence') as string) : null
+    const aiDamagePct = formData.get('ai_damage_pct') ? parseFloat(formData.get('ai_damage_pct') as string) : null
+
+    if (!idempotencyKey || !userId || !lahanId || isNaN(latitude) || isNaN(longitude) || !clientCreatedAt) {
+      return NextResponse.json(
+        { error: 'Data tidak lengkap' },
+        { status: 400 }
+      )
+    }
+
+    if (userId !== user.id) {
+      return NextResponse.json(
+        { error: 'User ID tidak cocok' },
+        { status: 403 }
+      )
+    }
+
+    // Check if lahan belongs to user or same poktan
+    const { data: lahan, error: lahanError } = await supabase
+      .from('lahan')
+      .select('id, owner_id, poktan_id, polygon')
+      .eq('id', lahanId)
+      .single()
+
+    if (lahanError || !lahan) {
+      return NextResponse.json(
+        { error: 'Lahan tidak ditemukan' },
+        { status: 404 }
+      )
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('poktan_id')
+      .eq('id', user.id)
+      .single()
+
+    const isOwner = lahan.owner_id === user.id
+    const isSamePoktan = profile?.poktan_id && profile.poktan_id === lahan.poktan_id
+
+    if (!isOwner && !isSamePoktan) {
+      return NextResponse.json(
+        { error: 'Tidak memiliki akses ke lahan ini' },
+        { status: 403 }
+      )
+    }
+
+    // Validate geofence
+    const polygon = lahan.polygon as number[][]
+    const isInside = validateGeofence(latitude, longitude, polygon)
+
+    if (!isInside) {
+      return NextResponse.json(
+        { error: 'Lokasi laporan di luar batas lahan' },
+        { status: 400 }
+      )
+    }
+
+    // Process photos
+    const photos: File[] = []
+    for (const [key, value] of Array.from(formData.entries())) {
+      if (key.startsWith('photos') && value instanceof File) {
+        photos.push(value)
+      }
+    }
+
+    if (photos.length === 0) {
+      return NextResponse.json(
+        { error: 'Minimal 1 foto diperlukan' },
+        { status: 400 }
+      )
+    }
+
+    if (photos.length > 3) {
+      return NextResponse.json(
+        { error: 'Maksimal 3 foto per laporan' },
+        { status: 400 }
+      )
+    }
+
+    // Calculate hash of first photo for dedupe
+    const firstPhotoHash = await calculateSha256(photos[0])
+
+    // Check dedupe: same hash from same user within 24 hours
+    const { data: existingReport } = await supabase
+      .from('damage_reports')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('photo_hash', firstPhotoHash)
+      .gte('client_created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .single()
+
+    if (existingReport) {
+      return NextResponse.json(
+        { error: 'Foto serupa sudah dilaporkan dalam 24 jam terakhir' },
+        { status: 409 }
+      )
+    }
+
+    // Upload photos to storage
+    const photoPaths: string[] = []
+    for (let i = 0; i < photos.length; i++) {
+      const photo = photos[i]
+      const ext = photo.type === 'image/png' ? 'png' : 'jpg'
+      const path = `${user.id}/reports/${idempotencyKey}_${i}.${ext}`
+
+      const { error: uploadError } = await admin.storage
+        .from('photos')
+        .upload(path, photo, {
+          contentType: photo.type,
+          upsert: false,
+        })
+
+      if (uploadError) {
+        return NextResponse.json(
+          { error: 'Gagal mengupload foto' },
+          { status: 500 }
+        )
+      }
+
+      photoPaths.push(path)
+    }
+
+    // Insert report (upsert by idempotency_key)
+    const { error: reportError } = await supabase
+      .from('damage_reports')
+      .upsert({
+        idempotency_key: idempotencyKey,
+        user_id: userId,
+        lahan_id: lahanId,
+        photo_paths: photoPaths,
+        photo_hash: firstPhotoHash,
+        ai_status: aiStatus,
+        ai_confidence: aiConfidence,
+        ai_damage_pct: aiDamagePct,
+        latitude,
+        longitude,
+        client_created_at: clientCreatedAt,
+      }, {
+        onConflict: 'idempotency_key',
+      })
+
+    if (reportError) {
+      return NextResponse.json(
+        { error: 'Gagal menyimpan laporan' },
+        { status: 500 }
+      )
+    }
+
+    // Audit log
+    await admin
+      .from('audit_logs')
+      .insert({
+        actor_id: user.id,
+        action: 'submit_report',
+        entity: 'damage_reports',
+        entity_id: idempotencyKey,
+        meta: { lahan_id: lahanId, ai_status: aiStatus },
+      })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Sync error:', error)
+    return NextResponse.json(
+      { error: 'Terjadi kesalahan server' },
+      { status: 500 }
+    )
+  }
+}
+
+function validateGeofence(
+  latitude: number,
+  longitude: number,
+  polygon: number[][]
+): boolean {
+  const [x, y] = [longitude, latitude]
+  let inside = false
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i]
+    const [xj, yj] = polygon[j]
+
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+
+    if (intersect) inside = !inside
+  }
+
+  return inside
+}
