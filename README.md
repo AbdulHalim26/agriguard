@@ -127,6 +127,49 @@ Deploy ke Hugging Face Spaces: buat Space Docker, upload isi `ai-service/` (term
   idempotency via `idempotency_key`, upload ke bucket `photos` (private), insert
   `damage_reports` + `audit_logs`.
 
+## Fitur M3 — Offline, Peta & Verifikasi
+
+- `/scan`: saat offline, payload + foto (sudah dikompres 1280px/0.8) disimpan ke
+  IndexedDB (`lib/offline/db.ts`). Widget "Menunggu Sync (n)" tampil di dashboard.
+- `/api/sync`: sinkronisasi idempotent via `idempotency_key` (laporan yang sama
+  tidak pernah diduplikasi). Sukses → item keluar dari antrian; gagal → tetap
+  di antrian dan di-retry (event `online`, fokus jendela, tiap 60 detik).
+- `/peta`: Leaflet + OpenStreetMap — polygon lahan + pin per `ai_status`
+  (hijau `aman` / amber `rusak_ringan` / merah `rusak_berat` / abu `manual`),
+  klik pin → modal detail (foto signed URL, petani, koordinat, hasil AI, waktu).
+- `/verifikasi` (ppl/dinas): daftar laporan + modal Setujui/Tolak + catatan.
+  Setiap aksi menulis `audit_logs`; status berubah di sisi petani (`/laporan`).
+  Petani di-redirect dari `/verifikasi` (middleware + server check).
+- Input tinggi air (`water_levels`) per kecamatan oleh PPL/Dinas; tampil di
+  dashboard petani sesuai district poktan.
+
+### Verifikasi Manual — Offline Sync (FR-03)
+
+1. Buka `/scan` di browser, devtools → Network → set **Offline**.
+2. Foto padi → tunggu hasil AI (atau "Lapor Manual") → pilih lahan → ambil GPS
+   / klik peta di dalam polygon → **Kirim Laporan**. Muncul pesan "tersimpan offline".
+3. Kembali ke `/dashboard`: widget **"Menunggu Sync (n)"** menampilkan jumlah antrian.
+4. **Kill/close tab browser** (masih offline), lalu buka lagi `/dashboard` →
+   antrian tetap ada (data bertahan di IndexedDB).
+5. Set Network kembali **Online**. Antrian tersinkron otomatis. Cek `/laporan`:
+   laporan muncul. Ulangi sync (tombol "Sinkronkan Sekarang") → **tidak ada duplikat**.
+6. (Opsional) Lakukan 2 laporan offline berurutan di sesi `/scan` yang sama →
+   antrian harus bertambah 2 (bukan saling menimpa).
+
+### Verifikasi Manual — Alur PPL/Dinas (FR-04)
+
+1. Login sebagai **PPL (081234567892)** dengan OTP `123456`.
+2. Buka `/verifikasi` → tab **Verifikasi Laporan**. Klik satu laporan → modal
+   detail (foto, petani, koordinat, hasil AI, waktu).
+3. Isi catatan → klik **Setujui** (atau **Tolak**). Seharusnya muncul pesan sukses
+   dan baris masuk tabel `audit_logs` (action `verify_report`/`reject_report`).
+4. Login sebagai **petani (081234567890)** → `/laporan`: status laporan berubah
+   menjadi **Tervalidasi** + catatan verifikasi tampil.
+5. Login sebagai **petani** lalu akses `/verifikasi` langsung → di-redirect ke
+   `/dashboard` (dijaga middleware + RLS).
+6. Tab **Tinggi Air**: pilih kecamatan + isi tinggi air → **Simpan**. Cek dashboard
+   petani di district yang sama menampilkan nilai tinggi air terbaru.
+
 ## Demo Accounts (OTP: 123456)
 
 | Role | Phone | Email Alias |
