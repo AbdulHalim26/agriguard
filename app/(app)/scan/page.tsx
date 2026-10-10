@@ -115,6 +115,15 @@ export default function ScanPage() {
   }, [loadLahan])
 
   const handleFile = useCallback(async (file: File) => {
+    // Kunci idempotency baru per foto. Ini memastikan tiap laporan (termasuk
+    // saat offline, tanpa meninggalkan halaman) dapat identitas unik sehingga
+    // entri antrian IndexedDB tidak saling menimpa. Retry laporan yang sama
+    // tetap memakai kunci ini.
+    idempotencyKeyRef.current =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `key_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+
     setSubmitError(null)
     setAiError(null)
     setAiResult(null)
