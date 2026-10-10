@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle, Loader2, Droplets } from 'lucide-react'
 import { upsertWaterLevel, listWaterLevels, WaterLevelData } from './water-actions'
 
@@ -91,10 +91,11 @@ export default function WaterLevelForm() {
     }
   }
 
-  // Fetch on mount
-  if (typeof window !== 'undefined') {
+  // Fetch sekali saat mount (bukan di body render -> mencegah infinite loop).
+  useEffect(() => {
     fetchWaterLevels()
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
