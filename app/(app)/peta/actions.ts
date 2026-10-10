@@ -57,7 +57,7 @@ export async function getPetaData(): Promise<{
   // Laporan yang terlihat (RLS: sendiri, satu poktan, atau ppl/dinas)
   const { data: reportRows, error: reportError } = await supabase
     .from('damage_reports')
-    .select('*, lahan(id, name), profiles(full_name)')
+    .select('*, lahan(id, name), profiles!damage_reports_user_id_fkey(full_name)')
     .order('server_created_at', { ascending: false })
     .limit(200)
 
