@@ -4,10 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw, History, Filter } from 'lucide-react'
 import {
   listAuditLogs,
-  ACTION_LABELS,
-  ENTITY_LABELS,
   type AuditLog,
 } from './audit-actions'
+import { ACTION_LABELS, ENTITY_LABELS } from '@/lib/audit-labels'
 
 function formatDateTime(value: string): string {
   const d = new Date(value)
@@ -42,8 +41,13 @@ export default function AuditTrail() {
       const res = await listAuditLogs()
       if (res.error) setError(res.error)
       else setLogs(res.data || [])
-    } catch {
-      setError('Koneksi terputus. Coba lagi saat online.')
+    } catch (err) {
+      console.error('[audit] gagal memuat:', err)
+      setError(
+        err instanceof Error
+          ? `Gagal memuat audit trail: ${err.message}`
+          : 'Koneksi terputus. Coba lagi saat online.'
+      )
     } finally {
       setLoading(false)
     }

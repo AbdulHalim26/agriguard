@@ -45,6 +45,11 @@ export default function AppLayout({
   const [userRole, setUserRole] = useState<'petani' | 'ppl' | 'dinas' | null>(null)
   const [userName, setUserName] = useState('')
 
+  // Tutup drawer mobile setiap kali rute berubah
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [pathname])
+
   // Fetch user role on mount
   useEffect(() => {
     const fetchUser = async () => {
