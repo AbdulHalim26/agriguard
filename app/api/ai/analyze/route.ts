@@ -1,44 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { analyzeImage } from '@/lib/ai'
 
+const RATE_LIMIT_PER_DAY = 20
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+// Catatan desain: rate limit disimpan di memori (per instance server).
+// Reset saat proses restart — cukup untuk demo; untuk produksi gunakan
+// tabel/redirect ke penyimpanan bersama.
+const usage = new Map<string, number[]>()
+
+function consumeQuota(userId: string): boolean {
+  const now = Date.now()
+  const recent = (usage.get(userId) || []).filter((t) => now - t < ONE_DAY_MS)
+
+  if (recent.length >= RATE_LIMIT_PER_DAY) {
+    usage.set(userId, recent)
+    return false
+  }
+
+  recent.push(now)
+  usage.set(userId, recent)
+  return true
+}
+
 export async function POST(request: NextRequest) {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
+  }
+
+  if (!consumeQuota(user.id)) {
+    return NextResponse.json(
+      {
+        error: `Batas analisis AI harian tercapai (${RATE_LIMIT_PER_DAY} kali/hari). Silakan lapor manual.`,
+        manual: true,
+      },
+      { status: 429 }
+    )
+  }
+
+  let formData: FormData
   try {
-    const formData = await request.formData()
-    const file = formData.get('image') as File
+    formData = await request.formData()
+  } catch {
+    return NextResponse.json(
+      { error: 'Data request tidak valid', manual: true },
+      { status: 400 }
+    )
+  }
 
-    if (!file) {
-      return NextResponse.json(
-        { error: 'File gambar diperlukan' },
-        { status: 400 }
-      )
-    }
+  const file = formData.get('image')
 
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json(
-        { error: 'File harus berupa gambar' },
-        { status: 400 }
-      )
-    }
+  if (!(file instanceof File)) {
+    return NextResponse.json(
+      { error: 'File gambar diperlukan', manual: true },
+      { status: 400 }
+    )
+  }
 
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'Ukuran file maksimal 5MB' },
-        { status: 400 }
-      )
-    }
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    return NextResponse.json(
+      { error: 'Format file harus JPG atau PNG', manual: true },
+      { status: 400 }
+    )
+  }
 
-    const arrayBuffer = await file.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
+  if (file.size > 5 * 1024 * 1024) {
+    return NextResponse.json(
+      { error: 'Ukuran file maksimal 5MB', manual: true },
+      { status: 400 }
+    )
+  }
 
-    const result = await analyzeImage(base64)
-
+  try {
+    const result = await analyzeImage(file)
     return NextResponse.json(result)
   } catch (error) {
-    console.error('AI analyze error:', error)
+    console.error('[ai/analyze] gagal:', error)
     const message = error instanceof Error ? error.message : 'Gagal menganalisis gambar'
+    const isTimeout = message.toLowerCase().includes('timeout')
     return NextResponse.json(
-      { error: message },
-      { status: 500 }
+      { error: message, manual: true },
+      { status: isTimeout ? 504 : 502 }
     )
   }
 }

@@ -4,33 +4,47 @@ export interface AiAnalysisResult {
   damage_pct: number
 }
 
-export async function analyzeImage(base64Image: string): Promise<AiAnalysisResult> {
-  const aiApiUrl = process.env.AI_API_URL
+const AI_TIMEOUT_MS = 15000
+
+export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
+  const aiApiUrl = process.env.AI_API_URL?.trim()
 
   if (!aiApiUrl) {
     throw new Error('AI_API_URL tidak dikonfigurasi')
   }
 
+  const formData = new FormData()
+  formData.append('image', image, 'scan.jpg')
+
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000)
+  const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
 
   try {
-    const response = await fetch(`${aiApiUrl}/predict`, {
+    const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/predict`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ image: base64Image }),
+      body: formData,
       signal: controller.signal,
     })
 
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      throw new Error(`AI service error: ${response.status}`)
+      const body = await response.json().catch(() => null)
+      const message = body?.detail || `AI service error: ${response.status}`
+      throw new Error(message)
     }
 
     const data = await response.json()
+
+    if (
+      !data ||
+      typeof data.status !== 'string' ||
+      !['aman', 'rusak_ringan', 'rusak_berat'].includes(data.status) ||
+      typeof data.confidence !== 'number' ||
+      typeof data.damage_pct !== 'number'
+    ) {
+      throw new Error('Respons AI tidak valid')
+    }
 
     return {
       status: data.status,
@@ -40,21 +54,21 @@ export async function analyzeImage(base64Image: string): Promise<AiAnalysisResul
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Timeout: AI service tidak merespons dalam 15 detik')
+      throw new Error('Timeout: AI tidak merespons dalam 15 detik')
     }
     throw error
   }
 }
 
 export async function checkAiHealth(): Promise<boolean> {
-  const aiApiUrl = process.env.AI_API_URL
+  const aiApiUrl = process.env.AI_API_URL?.trim()
 
   if (!aiApiUrl) {
     return false
   }
 
   try {
-    const response = await fetch(`${aiApiUrl}/health`, {
+    const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000),
     })
