@@ -20,7 +20,17 @@ import {
 } from '@/app/(app)/verifikasi/verification-actions'
 import { AI_STATUS_INFO, formatConfidence } from '@/lib/recommendations'
 
-type Filter = 'all' | 'pending' | 'verified'
+type Filter = 'all' | 'pending' | 'done'
+
+function isFinalized(r: Pick<VerificationReport, 'is_verified' | 'verified_at'>): boolean {
+  return r.is_verified || r.verified_at != null
+}
+
+function finalStatus(r: VerificationReport): 'verified' | 'rejected' | 'pending' {
+  if (r.is_verified) return 'verified'
+  if (r.verified_at != null) return 'rejected'
+  return 'pending'
+}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
@@ -38,7 +48,7 @@ function formatDateTime(value: string | null | undefined): string {
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Semua' },
   { key: 'pending', label: 'Menunggu' },
-  { key: 'verified', label: 'Tervalidasi' },
+  { key: 'done', label: 'Selesai' },
 ]
 
 export default function ReportVerification() {
@@ -75,8 +85,8 @@ export default function ReportVerification() {
   }, [fetchReports])
 
   const filtered = reports.filter((r) => {
-    if (filter === 'pending') return !r.is_verified
-    if (filter === 'verified') return r.is_verified
+    if (filter === 'pending') return !isFinalized(r)
+    if (filter === 'done') return isFinalized(r)
     return true
   })
 
@@ -210,10 +220,15 @@ export default function ReportVerification() {
                       {report.owner_name || 'Petani'} · {formatDateTime(report.server_created_at)}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                      {report.is_verified ? (
+                      {finalStatus(report) === 'verified' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                           <CheckCircle2 size={12} aria-hidden="true" />
-                          Tervalidasi
+                          Disetujui
+                        </span>
+                      ) : finalStatus(report) === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          <XCircle size={12} aria-hidden="true" />
+                          Ditolak
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
@@ -241,14 +256,16 @@ export default function ReportVerification() {
           onClick={() => setSelected(null)}
           role="dialog"
           aria-modal="true"
-          aria-label="Verifikasi laporan"
+          aria-label={finalStatus(selected) === 'pending' ? 'Verifikasi laporan' : 'Detail laporan'}
         >
           <div
             className="bg-white rounded-2xl w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2 mb-3">
-              <h3 className="font-semibold text-gray-900">Verifikasi Laporan</h3>
+              <h3 className="font-semibold text-gray-900">
+                {finalStatus(selected) === 'pending' ? 'Verifikasi Laporan' : 'Detail Laporan'}
+              </h3>
               <button
                 onClick={() => setSelected(null)}
                 className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
@@ -314,64 +331,90 @@ export default function ReportVerification() {
                   {formatDateTime(selected.server_created_at)}
                 </p>
               </div>
-              {selected.is_verified && (
+              {finalStatus(selected) !== 'pending' && (
                 <div>
-                  <p className="text-xs text-gray-500">Status</p>
-                  <p className="font-medium text-green-700">
-                    Tervalidasi {selected.verifier_name ? `oleh ${selected.verifier_name}` : ''} ·{' '}
-                    {formatDateTime(selected.verified_at)}
-                  </p>
+                  <p className="text-xs text-gray-500">Status Final</p>
+                  {finalStatus(selected) === 'verified' ? (
+                    <p className="font-medium text-green-700">
+                      <CheckCircle2 size={14} className="inline mr-1" aria-hidden="true" />
+                      Disetujui{selected.verifier_name ? ` oleh ${selected.verifier_name}` : ''} ·{' '}
+                      {formatDateTime(selected.verified_at)}
+                    </p>
+                  ) : (
+                    <p className="font-medium text-red-700">
+                      <XCircle size={14} className="inline mr-1" aria-hidden="true" />
+                      Ditolak{selected.verifier_name ? ` oleh ${selected.verifier_name}` : ''} ·{' '}
+                      {formatDateTime(selected.verified_at)}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            <label className="block mt-4">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
-                <StickyNote size={14} aria-hidden="true" />
-                Catatan Verifikasi
-              </span>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={3}
-                maxLength={500}
-                placeholder="Catatan untuk petani (opsional)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm"
-              />
-            </label>
+            {finalStatus(selected) === 'pending' ? (
+              <>
+                <label className="block mt-4">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                    <StickyNote size={14} aria-hidden="true" />
+                    Catatan Verifikasi
+                  </span>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Catatan untuk petani (opsional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm"
+                  />
+                </label>
 
-            {actionError && (
-              <div className="mt-3 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" role="alert">
-                {actionError}
+                {actionError && (
+                  <div className="mt-3 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" role="alert">
+                    {actionError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <button
+                    onClick={() => handleAction(false)}
+                    disabled={acting}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium"
+                  >
+                    {acting ? (
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <XCircle size={16} aria-hidden="true" />
+                    )}
+                    Tolak
+                  </button>
+                  <button
+                    onClick={() => handleAction(true)}
+                    disabled={acting}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium"
+                  >
+                    {acting ? (
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ShieldCheck size={16} aria-hidden="true" />
+                    )}
+                    Setujui
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="mt-4">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                  <StickyNote size={14} aria-hidden="true" />
+                  Catatan
+                </p>
+                <p className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap">
+                  {selected.verification_note || 'Tidak ada catatan'}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Keputusan final — aksi verifikasi tidak tersedia lagi untuk laporan ini.
+                </p>
               </div>
             )}
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <button
-                onClick={() => handleAction(false)}
-                disabled={acting}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium"
-              >
-                {acting ? (
-                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <XCircle size={16} aria-hidden="true" />
-                )}
-                Tolak
-              </button>
-              <button
-                onClick={() => handleAction(true)}
-                disabled={acting}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium"
-              >
-                {acting ? (
-                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <ShieldCheck size={16} aria-hidden="true" />
-                )}
-                Setujui
-              </button>
-            </div>
           </div>
         </div>
       )}
