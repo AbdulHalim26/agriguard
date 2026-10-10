@@ -10,6 +10,14 @@ import { createLahan } from './actions'
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
 const DEFAULT_ZOOM = 16
 
+const numberedMarkerIcon = (n: number) =>
+  Leaflet.divIcon({
+    className: '',
+    html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:#16a34a;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,.4);font-family:system-ui,sans-serif;line-height:1">${n}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  })
+
 interface MapPolygonEditorProps {
   onPolygonChange: (points: number[][]) => void
   initialPolygon?: number[][]
@@ -77,17 +85,14 @@ function MapPolygonEditor({ onPolygonChange, initialPolygon }: MapPolygonEditorP
             />
             {points.map(([lng, lat], index) => (
               <Marker
-                key={index}
+                key={`${index}-${lng}-${lat}`}
                 position={[lat, lng] as [number, number]}
+                icon={numberedMarkerIcon(index + 1)}
                 draggable
                 eventHandlers={{
                   dragend: e => handlePointDrag(index, e),
                 }}
-              >
-                <div className="w-6 h-6 bg-green-600 border-2 border-white rounded-full shadow-lg flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">{index + 1}</span>
-                </div>
-              </Marker>
+              />
             ))}
           </>
         )}

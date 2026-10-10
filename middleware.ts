@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSupabaseConfig, supabaseNotConfiguredMessage } from '@/lib/supabase/env'
 
 function createMockQueryBuilder(data: any[]) {
   let filtered = [...data]
@@ -72,12 +73,15 @@ function createMockSupabaseServer(request: NextRequest) {
 }
 
 export async function middleware(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const { url, anonKey, isConfigured } = getSupabaseConfig()
 
-  // Use mock client if no env vars
-  const supabase = url && key
-    ? (await import('@supabase/ssr')).createServerClient(url, key, {
+  if (!isConfigured && process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
+    console.warn('[supabase] middleware: MOCK MODE ACTIVE (Supabase envar kosong).')
+  }
+
+  // Use mock client only when env vars are truly empty
+  const supabase = isConfigured
+    ? (await import('@supabase/ssr')).createServerClient(url, anonKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll()

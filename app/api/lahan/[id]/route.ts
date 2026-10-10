@@ -39,6 +39,7 @@ export async function DELETE(
     .eq('id', id)
 
   if (error) {
+    console.error('[DELETE /api/lahan/:id] gagal:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
@@ -86,6 +87,7 @@ export async function PATCH(
     .single()
 
   if (error) {
+    console.error('[PATCH /api/lahan/:id] gagal:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

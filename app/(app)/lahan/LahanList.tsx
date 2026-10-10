@@ -122,7 +122,7 @@ export default function LahanList({ initialData = [] }: LahanListProps) {
                 </span>
               </div>
               <div className="text-xs text-gray-400">
-                Dibuat: {new Date(item.created_at).toLocaleDateString('id-ID')}
+                Dibuat: {item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
               </div>
             </div>
             {editingId === item.id && (

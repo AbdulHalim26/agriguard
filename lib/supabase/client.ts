@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { getSupabaseConfig, supabaseNotConfiguredMessage } from './env'
 
 // Seed user mapping (phone -> seed profile data)
 const SEED_USERS: Record<string, { id: string; full_name: string; role: 'petani' | 'ppl' | 'dinas'; poktan_id: string }> = {
@@ -96,11 +97,14 @@ function createMockQueryBuilder(data: any[]) {
 }
 
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const { url, anonKey, isConfigured } = getSupabaseConfig()
 
-  if (!url || !key) {
-    // Return a mock client for static generation and demo mode
+  if (!isConfigured) {
+    if (typeof console !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.warn('[supabase] MOCK MODE ACTIVE (Supabase envar kosong). CRUD/read pada tabel bisnis DITOLAK dengan error agar tidak menyesatkan.')
+    }
+
+    // Return a mock client for auth/demo only. Business tables are DENIED.
     return {
       auth: {
         getUser: async () => {
@@ -171,6 +175,28 @@ export function createClient() {
         },
       },
       from: (table: string) => {
+        const DEMO_TABLES = new Set(['profiles', 'poktan'])
+
+        if (!DEMO_TABLES.has(table)) {
+          const denied = { data: null, error: { message: supabaseNotConfiguredMessage() } }
+          const deniedBuilder = {
+            ...denied,
+            select: () => deniedBuilder,
+            eq: () => deniedBuilder,
+            order: () => deniedBuilder,
+            limit: () => deniedBuilder,
+            single: () => denied,
+            then: (resolve: (v: any) => any) => resolve(denied),
+          }
+          return {
+            select: () => deniedBuilder,
+            insert: (row: any) => deniedBuilder,
+            update: (row: any) => deniedBuilder,
+            delete: () => deniedBuilder,
+            upsert: (row: any) => deniedBuilder,
+          }
+        }
+
         const mockData: Record<string, any[]> = {
           profiles: [
             { id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', phone: '6281234567890', full_name: 'Budi Santoso', role: 'petani', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
@@ -180,9 +206,6 @@ export function createClient() {
           ],
           poktan: [
             { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Poktan Sukamaju — Karawang', village: 'Sukamaju', district: 'Telukjambe Timur', invite_code: 'DEMO01' },
-          ],
-          lahan: [
-            { id: 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', owner_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Sawah Budi Blok A', area_hectares: 0.75, polygon: [[107.285,-6.312],[107.286,-6.312],[107.286,-6.313],[107.285,-6.313],[107.285,-6.312]] },
           ],
         }
 
@@ -245,5 +268,5 @@ export function createClient() {
     } as any
   }
 
-  return createBrowserClient(url, key)
+  return createBrowserClient(url, anonKey)
 }

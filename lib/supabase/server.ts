@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getSupabaseConfig, supabaseNotConfiguredMessage } from './env'
 
 function parseMockSession(cookieStore: ReturnType<typeof cookies>) {
   const sessionCookie = cookieStore.get('agriguard-mock-session')
@@ -16,6 +17,7 @@ function parseMockSession(cookieStore: ReturnType<typeof cookies>) {
 
 function createMockQueryBuilder(data: any[]) {
   let filtered = [...data]
+
   const chainable = {
     select: () => chainable,
     data: filtered,
@@ -27,6 +29,21 @@ function createMockQueryBuilder(data: any[]) {
     single: () => ({ data: filtered[0] || null, error: filtered[0] ? null : { message: 'Not found' } }),
     order: () => chainable,
     limit: () => chainable,
+  }
+  return chainable
+}
+
+function createDeniedQueryBuilder(isMutation: boolean) {
+  const base = { data: null, error: { message: supabaseNotConfiguredMessage() } }
+  const chainable = {
+    ...base,
+    select: () => chainable,
+    eq: () => chainable,
+    neq: () => chainable,
+    order: () => chainable,
+    limit: () => chainable,
+    single: () => base,
+    then: (resolve: (v: any) => any) => resolve(isMutation ? { data: null, error: base.error } : base),
   }
   return chainable
 }
@@ -52,14 +69,19 @@ function createMockSupabaseClient(mockUser: any) {
 
   const profiles = mockUserProfile ? [...baseProfiles, mockUserProfile] : baseProfiles
 
+  // Only auth/demo tables (profiles, poktan) provide stub data in mock mode.
+  // Authorization/mutations on business tables must fail loudly instead of faking success.
   const mockData: Record<string, any[]> = {
     profiles,
     poktan: [
       { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Poktan Sukamaju — Karawang', village: 'Sukamaju', district: 'Telukjambe Timur', invite_code: 'DEMO01' },
     ],
-    lahan: [
-      { id: 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', owner_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Sawah Budi Blok A', area_hectares: 0.75, polygon: [[107.285,-6.312],[107.286,-6.312],[107.286,-6.313],[107.285,-6.313],[107.285,-6.312]] },
-    ],
+  }
+
+  const DEMO_TABLES = new Set(['profiles', 'poktan'])
+
+  if (typeof console !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    console.warn('[supabase] MOCK MODE ACTIVE (Supabase envar kosong). CRUD/read pada tabel bisnis DITOLAK dengan error agar tidak menyesatkan.')
   }
 
   return {
@@ -72,6 +94,15 @@ function createMockSupabaseClient(mockUser: any) {
       },
     },
     from: (table: string) => {
+      if (!DEMO_TABLES.has(table)) {
+        return {
+          select: () => createDeniedQueryBuilder(false),
+          insert: (row: any) => createDeniedQueryBuilder(true),
+          update: (row: any) => createDeniedQueryBuilder(true),
+          delete: () => createDeniedQueryBuilder(true),
+          upsert: (row: any) => createDeniedQueryBuilder(true),
+        }
+      }
       const data = mockData[table] || []
       return {
         select: (cols?: string) => createMockQueryBuilder(data),
@@ -91,16 +122,15 @@ function createMockSupabaseClient(mockUser: any) {
 
 export function createClient() {
   const cookieStore = cookies()
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const { url, anonKey, isConfigured } = getSupabaseConfig()
 
   const mockUser = parseMockSession(cookieStore)
 
-  if (!url || !key) {
+  if (!isConfigured) {
     return createMockSupabaseClient(mockUser)
   }
 
-  return createServerClient(url, key, {
+  return createServerClient(url, anonKey, {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value

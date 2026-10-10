@@ -36,6 +36,7 @@ export async function listMyLahan(): Promise<{ data: LahanWithPolygon[] | null; 
     .order('created_at', { ascending: false })
 
   if (error) {
+    console.error('[listMyLahan] SELECT gagal:', error.message)
     return { data: null, error: error.message }
   }
 
@@ -78,6 +79,7 @@ export async function createLahan(input: LahanInput): Promise<{ data: LahanWithP
     .single()
 
   if (error) {
+    console.error('[createLahan] INSERT gagal:', error.message)
     return { data: null, error: error.message }
   }
 
@@ -125,6 +127,7 @@ export async function updateLahan(
     .single()
 
   if (error) {
+    console.error('[updateLahan] UPDATE gagal:', error.message)
     return { data: null, error: error.message }
   }
 
