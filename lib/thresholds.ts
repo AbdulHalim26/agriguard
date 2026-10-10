@@ -81,7 +81,7 @@ export function getStaticRecommendation(status: FloodStatus): string[] {
       return [
         'Pantau perkembangan cuaca melalui aplikasi BMKG',
         'Periksa kondisi bendungan/pintu air terdekat',
-        'Siapkan perlengkapan darurat sebagaikeman',
+        'Siapkan perlengkapan darurat sebagaimana',
         'Koordinasi dengan ketua Poktan/RT/RW setempat',
       ]
     case 'aman':

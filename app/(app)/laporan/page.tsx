@@ -6,6 +6,7 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
+  XCircle,
   RefreshCw,
   Loader2,
   MapPin,
@@ -29,12 +30,26 @@ function formatDateTime(value: string | null | undefined): string {
   })
 }
 
-function VerificationBadge({ isVerified }: { isVerified: boolean }) {
+function VerificationBadge({
+  isVerified,
+  verifiedAt,
+}: {
+  isVerified: boolean
+  verifiedAt: string | null
+}) {
   if (isVerified) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
         <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
         Tervalidasi
+      </span>
+    )
+  }
+  if (verifiedAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+        <XCircle className="w-3 h-3" aria-hidden="true" />
+        Ditolak
       </span>
     )
   }
@@ -201,7 +216,10 @@ export default function LaporanPage() {
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <VerificationBadge isVerified={report.is_verified} />
+                      <VerificationBadge
+                        isVerified={report.is_verified}
+                        verifiedAt={report.verified_at}
+                      />
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                         <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                         Tersinkron
@@ -212,7 +230,7 @@ export default function LaporanPage() {
                       </span>
                     </div>
 
-                    {report.verification_note && report.is_verified && (
+                    {report.verification_note && (report.is_verified || report.verified_at) && (
                       <p className="mt-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
                         {report.verification_note}
                       </p>

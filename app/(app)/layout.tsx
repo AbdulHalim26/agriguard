@@ -18,7 +18,6 @@ import {
   X,
   ChevronDown,
   User,
-  Settings,
 } from 'lucide-react'
 
 const navigation = [
@@ -170,13 +169,6 @@ export default function AppLayout({
               </div>
             </div>
             <div className="mt-2 space-y-1">
-              <Link
-                href="/settings"
-                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Settings size={20} aria-hidden="true" />
-                Pengaturan
-              </Link>
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
