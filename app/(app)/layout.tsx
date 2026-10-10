@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AutoSync from '@/components/AutoSync'
 import OfflineBanner from '@/components/features/OfflineBanner'
+import PendingReportsBadge from '@/components/features/PendingReportsBadge'
 import {
   LayoutDashboard,
   MapPin,
@@ -100,13 +101,16 @@ export default function AppLayout({
               </div>
               <span className="font-semibold text-gray-900">AgriGuard</span>
             </Link>
-            <button
-              className="lg:hidden p-2 text-gray-500 hover:text-gray-700"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Tutup menu"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-1">
+              {showAdminNav && <PendingReportsBadge />}
+              <button
+                className="lg:hidden p-2 text-gray-500 hover:text-gray-700"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Tutup menu"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -204,7 +208,7 @@ export default function AppLayout({
               <Menu size={24} />
             </button>
             <span className="font-semibold text-gray-900">AgriGuard</span>
-            <div className="w-10" />
+            {showAdminNav ? <PendingReportsBadge /> : <div className="w-10" />}
           </div>
         </header>
 

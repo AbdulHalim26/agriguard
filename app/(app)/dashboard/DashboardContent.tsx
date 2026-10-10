@@ -6,18 +6,24 @@ import FloodStatusCard from '@/components/features/FloodStatusCard'
 import SyncWidget from '@/components/features/SyncWidget'
 import DashboardHero from './DashboardHero'
 import ReportSummary from './ReportSummary'
+import NewReportsBanner from '@/components/features/NewReportsBanner'
 
 interface DashboardContentProps {
   userName: string
   userId: string
   demoMode: boolean
+  role?: string | null
 }
 
-export default function DashboardContent({ userName, userId, demoMode }: DashboardContentProps) {
+export default function DashboardContent({ userName, userId, demoMode, role }: DashboardContentProps) {
+  const isPplDinas = role === 'ppl' || role === 'dinas'
   return (
     <div className="space-y-6">
       {/* Hero status banjir + CTA scan (FR-01 / FR-02) */}
       <DashboardHero userName={userName} />
+
+      {/* Banner laporan baru untuk PPL/Dinas (M4-9) */}
+      {isPplDinas && <NewReportsBanner />}
 
       {/* Widget antrian offline (FR-03) */}
       <SyncWidget userId={userId} />

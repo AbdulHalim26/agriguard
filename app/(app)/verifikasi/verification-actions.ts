@@ -114,6 +114,22 @@ export async function listVerificationReports(): Promise<{
   return { data: reports, error: null }
 }
 
+export async function getPendingReportCount(): Promise<{ count: number; error: string | null }> {
+  const supabase = createClient()
+
+  const { user, error: guardError } = await requirePplDinas(supabase)
+  if (!user) return { count: 0, error: guardError }
+
+  const { count, error } = await supabase
+    .from('damage_reports')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_verified', false)
+    .is('verified_at', null)
+
+  if (error) return { count: 0, error: error.message }
+  return { count: count ?? 0, error: null }
+}
+
 export async function setVerification(
   input: VerificationInput
 ): Promise<{ data: { id: string; is_verified: boolean } | null; error: string | null }> {
