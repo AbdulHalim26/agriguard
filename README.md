@@ -86,6 +86,47 @@ agriguard/
 └── public/              # Static assets
 ```
 
+## AI Service (`/ai-service`)
+
+FastAPI untuk klasifikasi foto padi (3 kelas: `aman`, `rusak_ringan`, `rusak_berat`).
+Saat ini memakai placeholder deterministik — kontrak endpoint sudah benar.
+
+### Run Lokal
+
+```bash
+cd ai-service
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Tes
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+
+curl -X POST http://localhost:8000/predict \
+  -F "image=@/path/foto.jpg"
+# {"status":"rusak_ringan","confidence":0.78,"damage_pct":30}
+```
+
+Setelah berjalan, isi `AI_API_URL=http://localhost:8000` di `.env` (server-only).
+Deploy ke Hugging Face Spaces: buat Space Docker, upload isi `ai-service/` (termasuk
+`Dockerfile`), lalu set `AI_API_URL` ke URL Space.
+
+## Fitur Scan & Laporan (M2b)
+
+- `/scan`: ambil/upload foto → kompres 1280px/0.8 → `/api/ai/analyze` (proxy server-only,
+  rate limit 20/hari, timeout 15s) → hasil AI + rekomendasi → pilih lahan → GPS/klik peta
+  → kirim laporan. Jika AI gagal → tombol "Lapor Manual".
+- `/laporan`: daftar laporan real dari Supabase, thumbnail via signed URL (1 jam), status
+  verifikasi + sinkron.
+- `submitReport` (server action): geofence ray-casting, dedupe foto sha256 (24 jam),
+  idempotency via `idempotency_key`, upload ke bucket `photos` (private), insert
+  `damage_reports` + `audit_logs`.
+
 ## Demo Accounts (OTP: 123456)
 
 | Role | Phone | Email Alias |
