@@ -13,9 +13,12 @@ export interface FloodStatusData {
   water_level_m: number | null
   last_updated: string | null
   source: 'openweathermap' | 'mock' | 'mock_fallback'
+  location_source: 'device' | 'default'
 }
 
-export async function getFloodStatus(): Promise<{ data: FloodStatusData | null; error: string | null }> {
+export async function getFloodStatus(
+  coords?: { lat: number; lon: number }
+): Promise<{ data: FloodStatusData | null; error: string | null }> {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -40,17 +43,26 @@ export async function getFloodStatus(): Promise<{ data: FloodStatusData | null; 
     district = poktan?.district || null
   }
 
-  // Fetch weather data
+  // Fetch weather data (koordinat perangkat bila tersedia, fallback Karawang)
   let rain3h: number | null = null
   let weatherSource: 'openweathermap' | 'mock' | 'mock_fallback' = 'mock'
+  let locationSource: 'device' | 'default' = 'default'
   try {
-    const weatherRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/weather`, {
+    const weatherUrl = new URL(
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/weather`
+    )
+    if (coords) {
+      weatherUrl.searchParams.set('lat', String(coords.lat))
+      weatherUrl.searchParams.set('lon', String(coords.lon))
+    }
+    const weatherRes = await fetch(weatherUrl.toString(), {
       next: { revalidate: 600 },
     })
     if (weatherRes.ok) {
       const weatherData = await weatherRes.json()
       rain3h = weatherData.rain_3h_mm ?? null
       weatherSource = weatherData.source || 'mock'
+      locationSource = weatherData.location_source || 'default'
     }
   } catch {
     // Silently fail, will use null rain3h
@@ -83,6 +95,7 @@ export async function getFloodStatus(): Promise<{ data: FloodStatusData | null; 
       water_level_m: waterLevel,
       last_updated: waterLevelUpdated,
       source: weatherSource,
+      location_source: locationSource,
     },
     error: null,
   }

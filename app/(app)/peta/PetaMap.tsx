@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Polygon, Marker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Marker, Tooltip, LayersControl, useMap } from 'react-leaflet'
 import * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PetaLahan, PetaReport } from './actions'
@@ -93,10 +93,20 @@ export default function PetaMap({
         className="h-[70vh] w-full"
         scrollWheelZoom
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Peta">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Satelit">
+            <TileLayer
+              attribution="Tiles &copy; Esri"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
         <MapInstanceCapture onReady={setMap} />
         <FitBounds lahan={lahan} />
 

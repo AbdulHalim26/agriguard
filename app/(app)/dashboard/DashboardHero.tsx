@@ -12,6 +12,7 @@ import {
   Droplets,
 } from 'lucide-react'
 import { getFloodStatus, type FloodStatusData } from '@/app/(app)/dashboard/flood-actions'
+import { hasGrantedLocation, requestLocation } from '@/lib/location'
 import {
   RAIN_THRESHOLD_WASPADA_MM,
   WATER_LEVEL_THRESHOLD_BAHAYA_M,
@@ -44,7 +45,21 @@ export default function DashboardHero({
     setLoading(true)
     setError(false)
     try {
-      const result = await getFloodStatus()
+      // Kirim koordinat perangkat bila izin sudah diberikan (tanpa prompt),
+      // fallback ke koordinat pusat Karawang di server.
+      let coords: { lat: number; lon: number } | undefined
+      try {
+        if (await hasGrantedLocation()) {
+          const loc = await requestLocation()
+          if (loc.status === 'granted' && loc.lat != null && loc.lng != null) {
+            coords = { lat: loc.lat, lon: loc.lng }
+          }
+        }
+      } catch {
+        coords = undefined
+      }
+
+      const result = await getFloodStatus(coords)
       if (result.error) throw new Error(result.error)
       setData(result.data)
     } catch {
@@ -126,7 +141,7 @@ export default function DashboardHero({
           : data?.description}
       </p>
 
-      <div className="grid grid-cols-2 gap-3 max-w-sm mb-5">
+      <div className="grid grid-cols-2 gap-3 max-w-sm mb-3">
         {indicators.map((ind) => (
           <div
             key={ind.label}
@@ -147,6 +162,16 @@ export default function DashboardHero({
           </div>
         ))}
       </div>
+
+      {data && !error && (
+        <p className="text-xs text-white/75 mb-5" aria-live="polite">
+          {data.source === 'openweathermap'
+            ? data.location_source === 'device'
+              ? 'Data cuaca real — lokasi Anda'
+              : 'Data cuaca real — lokasi default (Karawang)'
+            : 'Data simulasi'}
+        </p>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         {showScanCta && (

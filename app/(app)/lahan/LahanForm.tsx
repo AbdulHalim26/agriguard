@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, X, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
-import { MapContainer, TileLayer, Polygon, Marker, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Marker, LayersControl, useMap, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import * as Leaflet from 'leaflet'
 import { createLahan } from './actions'
@@ -92,10 +92,20 @@ function MapPolygonEditor({ onPolygonChange, initialPolygon }: MapPolygonEditorP
           zoom={DEFAULT_ZOOM}
           className="h-80 w-full rounded-lg border border-gray-300"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <LayersControl position="topright">
+            <LayersControl.BaseLayer checked name="Peta">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            </LayersControl.BaseLayer>
+            <LayersControl.BaseLayer name="Satelit">
+              <TileLayer
+                attribution="Tiles &copy; Esri"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              />
+            </LayersControl.BaseLayer>
+          </LayersControl>
           <MapInstanceCapture onReady={setMap} />
           <MapClickHandler onClick={handleMapClick} />
           {points.length > 0 && (
