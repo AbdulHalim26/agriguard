@@ -26,6 +26,13 @@ import {
 import { submitReport } from '@/app/(app)/laporan/actions'
 import { listMyLahan, type LahanWithPolygon } from '@/app/(app)/lahan/actions'
 import { saveReportOffline, type OfflineReport } from '@/lib/offline/db'
+import { autoSync } from '@/lib/offline/sync'
+import {
+  isOfflineNow,
+  markOffline,
+  markOnline,
+  useOfflineStatus,
+} from '@/lib/offline/status'
 import { useCurrentUserId } from '@/lib/offline/use-current-user'
 import type { GeoCoords } from './ScanMap'
 
@@ -40,6 +47,7 @@ const ScanMap = dynamic(() => import('./ScanMap'), {
 
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+const LAHAN_CACHE_KEY = 'agriguard-lahan-cache'
 
 interface AiResult {
   status: AiStatus
@@ -82,32 +90,46 @@ export default function ScanPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successId, setSuccessId] = useState<string | null>(null)
   const [savedOffline, setSavedOffline] = useState(false)
-  const [offline, setOffline] = useState(false)
+  const offline = useOfflineStatus()
 
   const userId = useCurrentUserId()
-
-  useEffect(() => {
-    const update = () => setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
-    update()
-    window.addEventListener('online', update)
-    window.addEventListener('offline', update)
-    return () => {
-      window.removeEventListener('online', update)
-      window.removeEventListener('offline', update)
-    }
-  }, [])
 
   const loadLahan = useCallback(async () => {
     setLahanLoading(true)
     setLahanError(null)
-    const res = await listMyLahan()
-    if (res.error) {
-      setLahanError(res.error)
-      setLahan([])
-    } else {
+    try {
+      const res = await listMyLahan()
+      if (res.error) throw new Error(res.error)
       setLahan(res.data || [])
+      // Cache lahan terakhir agar form tetap bisa dipakai saat offline.
+      try {
+        window.localStorage.setItem(LAHAN_CACHE_KEY, JSON.stringify(res.data || []))
+      } catch {
+        // ignore
+      }
+      markOnline()
+      // Keberhasilan request berikutnya = sinyal "kembali online" -> coba sync.
+      if (!isOfflineNow()) {
+        autoSync()
+      }
+    } catch (err) {
+      markOffline()
+      let cached: LahanWithPolygon[] = []
+      try {
+        const raw = window.localStorage.getItem(LAHAN_CACHE_KEY)
+        if (raw) cached = JSON.parse(raw) as LahanWithPolygon[]
+      } catch {
+        // ignore
+      }
+      setLahan(cached)
+      if (cached.length === 0) {
+        setLahanError(
+          'Tidak dapat memuat data lahan (koneksi terputus). Form scan tetap berfungsi; data akan tersinkron saat online.'
+        )
+      }
+    } finally {
+      setLahanLoading(false)
     }
-    setLahanLoading(false)
   }, [])
 
   useEffect(() => {
@@ -197,6 +219,46 @@ export default function ScanPage() {
       ? validateGeofence(coords.lat, coords.lng, selectedLahan.polygon as Polygon)
       : null
 
+  // FR-03: simpan payload + foto (sudah dikompres) ke IndexedDB. Dipakai saat
+  // benar-benar offline ATAU saat pengiriman online gagal karena network error.
+  const persistOffline = useCallback(async (): Promise<boolean> => {
+    if (!userId) {
+      setSubmitError('Sesi tidak tersedia untuk penyimpanan offline. Coba lagi.')
+      return false
+    }
+    if (!selectedLahan) {
+      setSubmitError('Pilih lahan tujuan laporan.')
+      return false
+    }
+    const aiStatus = aiResult?.status ?? (manualMode ? manualStatus : null)
+    const offlineReport: OfflineReport = {
+      id: idempotencyKeyRef.current,
+      idempotencyKey: idempotencyKeyRef.current,
+      userId,
+      lahanId: selectedLahan.id,
+      photoPaths: [],
+      photoHash: '',
+      aiStatus,
+      aiConfidence: aiResult ? aiResult.confidence : null,
+      aiDamagePct: aiResult ? aiResult.damage_pct : null,
+      latitude: coords!.lat,
+      longitude: coords!.lng,
+      clientCreatedAt: new Date().toISOString(),
+      photoBlobs: [photo!.blob],
+      synced: false,
+      retryCount: 0,
+    }
+    try {
+      await saveReportOffline(offlineReport)
+      markOffline()
+      setSavedOffline(true)
+      return true
+    } catch {
+      setSubmitError('Gagal menyimpan laporan offline. Coba lagi.')
+      return false
+    }
+  }, [userId, selectedLahan, coords, photo, aiResult, manualMode, manualStatus])
+
   const handleSubmit = useCallback(async () => {
     setSubmitError(null)
 
@@ -218,38 +280,11 @@ export default function ScanPage() {
       return
     }
 
-    // FR-03: saat offline, simpan payload + foto (sudah dikompres) ke IndexedDB.
-    // AutoSync di layout akan mengirim ke /api/sync saat koneksi kembali.
-    if (offline) {
-      if (!userId) {
-        setSubmitError('Sesi tidak tersedia untuk penyimpanan offline. Coba lagi.')
-        return
-      }
-      const aiStatus =
-        aiResult?.status ?? (manualMode ? manualStatus : null)
-      const offlineReport: OfflineReport = {
-        id: idempotencyKeyRef.current,
-        idempotencyKey: idempotencyKeyRef.current,
-        userId,
-        lahanId: selectedLahan.id,
-        photoPaths: [],
-        photoHash: '',
-        aiStatus,
-        aiConfidence: aiResult ? aiResult.confidence : null,
-        aiDamagePct: aiResult ? aiResult.damage_pct : null,
-        latitude: coords.lat,
-        longitude: coords.lng,
-        clientCreatedAt: new Date().toISOString(),
-        photoBlobs: [photo.blob],
-        synced: false,
-        retryCount: 0,
-      }
-      try {
-        await saveReportOffline(offlineReport)
-        setSavedOffline(true)
-      } catch {
-        setSubmitError('Gagal menyimpan laporan offline. Coba lagi.')
-      }
+    // Saat offline (navigator.onLine false ATAU request sebelumnya gagal),
+    // kirim langsung ke antrian IndexedDB. AutoSync akan mengirim ke /api/sync
+    // begitu koneksi kembali (event online / request sukses).
+    if (isOfflineNow()) {
+      await persistOffline()
       return
     }
 
@@ -275,13 +310,22 @@ export default function ScanPage() {
         setSubmitError(res.error)
         return
       }
+      markOnline()
+      if (!isOfflineNow()) {
+        autoSync()
+      }
       setSuccessId(res.data?.id || '')
     } catch {
-      setSubmitError('Terjadi kesalahan saat mengirim laporan. Coba lagi.')
+      // Network error (Supabase/Next.js tidak terjangkau walau navigator online):
+      // fallback ke antrian IndexedDB — form offline tetap berfungsi.
+      const saved = await persistOffline()
+      if (!saved) {
+        setSubmitError('Koneksi gagal dan laporan belum tersimpan. Coba lagi.')
+      }
     } finally {
       setSubmitting(false)
     }
-  }, [photo, selectedLahan, coords, aiResult, manualMode, manualStatus])
+  }, [photo, selectedLahan, coords, aiResult, manualMode, manualStatus, persistOffline])
 
   // Arahkan ke halaman laporan saat laporan sukses tersimpan
   useEffect(() => {

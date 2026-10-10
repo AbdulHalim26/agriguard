@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AutoSync from '@/components/AutoSync'
+import OfflineBanner from '@/components/features/OfflineBanner'
 import {
   LayoutDashboard,
   MapPin,
@@ -190,6 +191,9 @@ export default function AppLayout({
 
       {/* Server actions offline sync (berjalan sekali, global) */}
       <AutoSync />
+
+      {/* Banner mode offline (navigator.onLine false ATAU request gagal) */}
+      <OfflineBanner />
 
       {/* Main content */}
       <div className="lg:pl-64">

@@ -55,13 +55,19 @@ export default function ReportVerification() {
   const fetchReports = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const res = await listVerificationReports()
-    if (res.error) {
-      setError(res.error)
-    } else {
-      setReports(res.data || [])
+    try {
+      const res = await listVerificationReports()
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setReports(res.data || [])
+      }
+    } catch (err) {
+      console.error('[verifikasi] gagal memuat (offline?):', err)
+      setError('Koneksi terputus. Daftar laporan akan muncul kembali saat online.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {

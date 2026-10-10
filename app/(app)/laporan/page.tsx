@@ -79,15 +79,20 @@ export default function LaporanPage() {
     else setLoading(true)
     setError(null)
 
-    const res = await listMyReports()
-    if (res.error) {
-      setError(res.error)
-    } else {
-      setReports(res.data || [])
+    try {
+      const res = await listMyReports()
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setReports(res.data || [])
+      }
+    } catch (err) {
+      console.error('[laporan] gagal memuat (offline?):', err)
+      setError('Koneksi terputus. Riwayat laporan akan muncul kembali saat online.')
+    } finally {
+      if (asRefresh) setRefreshing(false)
+      else setLoading(false)
     }
-
-    if (asRefresh) setRefreshing(false)
-    else setLoading(false)
   }, [])
 
   useEffect(() => {

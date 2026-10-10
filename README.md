@@ -156,6 +156,21 @@ Deploy ke Hugging Face Spaces: buat Space Docker, upload isi `ai-service/` (term
 6. (Opsional) Lakukan 2 laporan offline berurutan di sesi `/scan` yang sama →
    antrian harus bertambah 2 (bukan saling menimpa).
 
+### Verifikasi Manual — Offline Bukan Blank / Form Tetap Jalan (FR-03)
+
+1. Buka `/scan` saat online dulu sampai data lahan tampil (lahan di-cache).
+2. Devtools → Network → pilih **Offline** (atau blokir host `supabase.co`).
+3. **Jangan tutup tab**: klik Menu → Dashboard, Lahan, Laporan — halaman TIDAK
+   blank. Muncul banner kuning "Mode Offline — laporan tersimpan lokal…".
+4. Kembali ke `/scan`: lahan masih terpilih (dari cache). Foto + pilih lahan +
+   lokasi → Kirim Laporan → tersimpan ke antrian (bukan error).
+5. Devtools → Network → **Online** → laporan otomatis tersinkron (event online
+   / request sukses berikutnya memicu auto-sync). Cek `/laporan` → muncul.
+6. Tutup tab (offline) lalu buka lagi → antrian masih ada → online → sync ulang
+   → tidak ada duplikat (idempotency_key).
+7. Paksa "online tapi gagal": dengan Network Online, blokir request `*/submitReport*`
+   di devtools lalu kirim laporan → tetap masuk antrian offline (bukan blank/error)
+
 ### Verifikasi Manual — Alur PPL/Dinas (FR-04)
 
 1. Login sebagai **PPL (081234567892)** dengan OTP `123456`.

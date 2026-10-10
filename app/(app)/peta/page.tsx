@@ -66,14 +66,21 @@ export default function PetaPage() {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const res = await getPetaData()
-    if (res.error) {
-      setError(res.error)
+    try {
+      const res = await getPetaData()
+      if (res.error) {
+        setError(res.error)
+        setData(null)
+      } else {
+        setData(res.data)
+      }
+    } catch (err) {
+      console.error('[peta] gagal memuat (offline?):', err)
+      setError('Koneksi terputus. Peta akan muncul kembali saat online.')
       setData(null)
-    } else {
-      setData(res.data)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
