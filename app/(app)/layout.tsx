@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import AutoSync from '@/components/AutoSync'
 import {
   LayoutDashboard,
   MapPin,
@@ -186,6 +187,9 @@ export default function AppLayout({
           </div>
         </div>
       </aside>
+
+      {/* Server actions offline sync (berjalan sekali, global) */}
+      <AutoSync />
 
       {/* Main content */}
       <div className="lg:pl-64">

@@ -9,9 +9,12 @@ import {
   RefreshCw,
   Loader2,
   MapPin,
+  UploadCloud,
 } from 'lucide-react'
 import { listMyReports, type ReportItem } from './actions'
 import { AI_STATUS_INFO, formatConfidence, type AiStatus } from '@/lib/recommendations'
+import { getReportCount, subscribeQueue } from '@/lib/offline/db'
+import { useCurrentUserId } from '@/lib/offline/use-current-user'
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
@@ -48,6 +51,28 @@ export default function LaporanPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const userId = useCurrentUserId()
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    const refresh = async () => {
+      try {
+        const c = await getReportCount(userId)
+        if (!cancelled) setPendingCount(c)
+      } catch {
+        if (!cancelled) setPendingCount(0)
+      }
+    }
+    refresh()
+    const unsub = subscribeQueue(refresh)
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [userId])
 
   const fetchReports = useCallback(async (asRefresh = false) => {
     if (asRefresh) setRefreshing(true)
@@ -93,6 +118,17 @@ export default function LaporanPage() {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" role="alert">
           {error}
+        </div>
+      )}
+
+      {pendingCount > 0 && (
+        <div
+          className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm flex items-center gap-2"
+          role="alert"
+        >
+          <UploadCloud size={16} className="shrink-0" aria-hidden="true" />
+          Ada {pendingCount} laporan tersimpan offline di perangkat ini — akan tersinkron otomatis
+          saat koneksi kembali.
         </div>
       )}
 

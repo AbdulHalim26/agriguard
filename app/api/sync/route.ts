@@ -110,23 +110,27 @@ export async function POST(request: NextRequest) {
     // Calculate hash of first photo for dedupe
     const firstPhotoHash = await calculateSha256(photos[0])
 
-    // Check dedupe: same hash from same user within 24 hours
+    // Check dedupe: same hash from same user within 24 hours.
+    // Exclude idempotency_key sendiri agar re-sync (retry/dup) tidak diblokir.
+    const dedupeCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { data: existingReport } = await supabase
       .from('damage_reports')
       .select('id')
       .eq('user_id', user.id)
       .eq('photo_hash', firstPhotoHash)
-      .gte('client_created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .single()
+      .neq('idempotency_key', idempotencyKey)
+      .gte('server_created_at', dedupeCutoff)
+      .limit(1)
 
-    if (existingReport) {
+    if (existingReport && existingReport.length > 0) {
       return NextResponse.json(
         { error: 'Foto serupa sudah dilaporkan dalam 24 jam terakhir' },
         { status: 409 }
       )
     }
 
-    // Upload photos to storage
+    // Upload photos to storage. upsert:true agar re-sync laporan yang sama
+    // (foto sudah terupload sebagian) tidak gagal.
     const photoPaths: string[] = []
     for (let i = 0; i < photos.length; i++) {
       const photo = photos[i]
@@ -137,7 +141,7 @@ export async function POST(request: NextRequest) {
         .from('photos')
         .upload(path, photo, {
           contentType: photo.type,
-          upsert: false,
+          upsert: true,
         })
 
       if (uploadError) {

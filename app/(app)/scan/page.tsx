@@ -14,6 +14,7 @@ import {
   RefreshCw,
   ArrowRight,
   FileWarning,
+  WifiOff,
 } from 'lucide-react'
 import { compressImage, validateGeofence, type Polygon } from '@/lib/geo'
 import {
@@ -24,6 +25,8 @@ import {
 } from '@/lib/recommendations'
 import { submitReport } from '@/app/(app)/laporan/actions'
 import { listMyLahan, type LahanWithPolygon } from '@/app/(app)/lahan/actions'
+import { saveReportOffline, type OfflineReport } from '@/lib/offline/db'
+import { useCurrentUserId } from '@/lib/offline/use-current-user'
 import type { GeoCoords } from './ScanMap'
 
 const ScanMap = dynamic(() => import('./ScanMap'), {
@@ -78,6 +81,21 @@ export default function ScanPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successId, setSuccessId] = useState<string | null>(null)
+  const [savedOffline, setSavedOffline] = useState(false)
+  const [offline, setOffline] = useState(false)
+
+  const userId = useCurrentUserId()
+
+  useEffect(() => {
+    const update = () => setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
+    update()
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
 
   const loadLahan = useCallback(async () => {
     setLahanLoading(true)
@@ -102,6 +120,7 @@ export default function ScanPage() {
     setAiResult(null)
     setManualMode(false)
     setSuccessId(null)
+    setSavedOffline(false)
 
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
       setAiError('Format foto harus JPG atau PNG.')
@@ -190,6 +209,41 @@ export default function ScanPage() {
       return
     }
 
+    // FR-03: saat offline, simpan payload + foto (sudah dikompres) ke IndexedDB.
+    // AutoSync di layout akan mengirim ke /api/sync saat koneksi kembali.
+    if (offline) {
+      if (!userId) {
+        setSubmitError('Sesi tidak tersedia untuk penyimpanan offline. Coba lagi.')
+        return
+      }
+      const aiStatus =
+        aiResult?.status ?? (manualMode ? manualStatus : null)
+      const offlineReport: OfflineReport = {
+        id: idempotencyKeyRef.current,
+        idempotencyKey: idempotencyKeyRef.current,
+        userId,
+        lahanId: selectedLahan.id,
+        photoPaths: [],
+        photoHash: '',
+        aiStatus,
+        aiConfidence: aiResult ? aiResult.confidence : null,
+        aiDamagePct: aiResult ? aiResult.damage_pct : null,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        clientCreatedAt: new Date().toISOString(),
+        photoBlobs: [photo.blob],
+        synced: false,
+        retryCount: 0,
+      }
+      try {
+        await saveReportOffline(offlineReport)
+        setSavedOffline(true)
+      } catch {
+        setSubmitError('Gagal menyimpan laporan offline. Coba lagi.')
+      }
+      return
+    }
+
     setSubmitting(true)
     try {
       const fd = new FormData()
@@ -234,6 +288,22 @@ export default function ScanPage() {
         <h1 className="text-2xl font-bold text-gray-900">Scan Kerusakan Padi</h1>
         <p className="text-gray-500 mt-1">Foto padi, hasil AI, lalu laporkan dengan lokasi.</p>
       </div>
+
+      {offline && (
+        <div
+          className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm"
+          role="alert"
+        >
+          <WifiOff className="w-5 h-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-medium">Anda sedang offline</p>
+            <p className="text-xs mt-0.5">
+              Scan & laporan tetap berfungsi. Foto + data disimpan lokal dan akan tersinkron
+              otomatis saat koneksi kembali.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bagian foto */}
       {!photo ? (
@@ -455,6 +525,16 @@ export default function ScanPage() {
               {inBounds
                 ? 'Lokasi berada di dalam batas lahan.'
                 : 'Lokasi di luar batas lahan — klik di dalam area hijau pada peta.'}
+            </div>
+          )}
+
+          {savedOffline && (
+            <div
+              className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm flex items-center gap-2"
+              role="alert"
+            >
+              <CheckCircle2 size={16} className="shrink-0" aria-hidden="true" />
+              Laporan tersimpan offline. Akan tersinkron otomatis saat koneksi kembali.
             </div>
           )}
 

@@ -3,13 +3,15 @@
 import Link from 'next/link'
 import { Camera, MapPin, FileText, Plus } from 'lucide-react'
 import FloodStatusCard from '@/components/features/FloodStatusCard'
+import SyncWidget from '@/components/features/SyncWidget'
 import { getFloodStatus } from '@/app/(app)/dashboard/flood-actions'
 
 interface DashboardContentProps {
   userName: string
+  userId: string
 }
 
-export default function DashboardContent({ userName }: DashboardContentProps) {
+export default function DashboardContent({ userName, userId }: DashboardContentProps) {
   return (
     <div className="space-y-6">
       {/* Welcome header */}
@@ -19,6 +21,9 @@ export default function DashboardContent({ userName }: DashboardContentProps) {
           <p className="text-gray-500 mt-1">Pantau kondisi sawah Anda secara real-time</p>
         </div>
       </div>
+
+      {/* Widget antrian offline (FR-03) */}
+      <SyncWidget userId={userId} />
 
       {/* Flood Status Card - FR-01 */}
       <FloodStatusCard />

@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
-interface OfflineReport {
+export interface OfflineReport {
   id: string
   idempotencyKey: string
   userId: string
@@ -16,6 +16,22 @@ interface OfflineReport {
   photoBlobs: Blob[]
   synced: boolean
   retryCount: number
+}
+
+// Catatan desain: event sederhana agar widget "Menunggu Sync (n)" di dashboard
+// dan AutoSync ikut ter-update saat antrian berubah (simpan/hapus item).
+type QueueListener = () => void
+const listeners = new Set<QueueListener>()
+
+export function subscribeQueue(listener: QueueListener): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function notifyQueueChanged() {
+  listeners.forEach((listener) => listener())
 }
 
 interface PendingUpload {
@@ -59,6 +75,7 @@ export async function getOfflineDB(): Promise<IDBPDatabase<OfflineDBSchema>> {
 export async function saveReportOffline(report: OfflineReport): Promise<void> {
   const db = await getOfflineDB()
   await db.put('reports', report)
+  notifyQueueChanged()
 }
 
 export async function getPendingReports(userId: string): Promise<OfflineReport[]> {
@@ -67,9 +84,13 @@ export async function getPendingReports(userId: string): Promise<OfflineReport[]
   return allReports.filter((r) => !r.synced)
 }
 
+// Catatan desain: tidak pakai getAllFromIndex('by-synced', false) karena kunci
+// boolean di IndexedDB tidak cocok dengan primitif 0/1; scan seluruh store lalu
+// filter di JS (volume queue kecil, aman untuk aplikasi demo).
 export async function getAllPendingReports(): Promise<OfflineReport[]> {
   const db = await getOfflineDB()
-  return db.getAllFromIndex('reports', 'by-synced', 0)
+  const all = await db.getAll('reports')
+  return all.filter((r) => !r.synced)
 }
 
 export async function markReportSynced(reportId: string): Promise<void> {
@@ -78,6 +99,7 @@ export async function markReportSynced(reportId: string): Promise<void> {
   if (report) {
     report.synced = true
     await db.put('reports', report)
+    notifyQueueChanged()
   }
 }
 
@@ -93,6 +115,7 @@ export async function incrementRetryCount(reportId: string): Promise<void> {
 export async function deleteReport(reportId: string): Promise<void> {
   const db = await getOfflineDB()
   await db.delete('reports', reportId)
+  notifyQueueChanged()
 }
 
 export async function getReportCount(userId: string): Promise<number> {
