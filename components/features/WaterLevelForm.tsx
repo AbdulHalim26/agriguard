@@ -27,6 +27,12 @@ const KARAWANG_DISTRICTS = [
   'Jayakerta',
 ]
 
+function formatDateTime(value: string): string {
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleString('id-ID')
+}
+
 export default function WaterLevelForm() {
   const [district, setDistrict] = useState('')
   const [riverLevel, setRiverLevel] = useState('')
@@ -190,7 +196,7 @@ export default function WaterLevelForm() {
                 <div>
                   <p className="font-medium text-gray-900">{wl.district}</p>
                   <p className="text-sm text-gray-500">
-                    Diupdate: {new Date(wl.updated_at).toLocaleString('id-ID')}
+                    Diupdate: {formatDateTime(wl.updated_at)}
                   </p>
                 </div>
                 <div className="text-right">

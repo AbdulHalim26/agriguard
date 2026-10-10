@@ -62,7 +62,6 @@ export default function PetaPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<PetaReport | null>(null)
-  const dialogRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -138,7 +137,6 @@ export default function PetaPage() {
 
       {selected && (
         <div
-          ref={dialogRef}
           className="fixed inset-0 z-[1100] bg-black/50 flex items-center justify-center p-4"
           onClick={() => setSelected(null)}
           role="dialog"

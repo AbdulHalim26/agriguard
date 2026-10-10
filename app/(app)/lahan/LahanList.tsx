@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { Trash2, Edit2, MapPin, Calculator } from 'lucide-react'
 import { LahanWithPolygon } from './actions'
 
+function formatDateOnly(value: string): string {
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 interface LahanListProps {
   initialData?: LahanWithPolygon[]
 }
@@ -122,7 +128,7 @@ export default function LahanList({ initialData = [] }: LahanListProps) {
                 </span>
               </div>
               <div className="text-xs text-gray-400">
-                Dibuat: {item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                Dibuat: {item.created_at ? formatDateOnly(item.created_at) : '—'}
               </div>
             </div>
             {editingId === item.id && (
