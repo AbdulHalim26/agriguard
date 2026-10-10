@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, X, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
-import { MapContainer, TileLayer, Polygon, Marker, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Polygon, Marker, useMap, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import * as Leaflet from 'leaflet'
 import { createLahan } from './actions'
+import LocateControl from '@/components/map/LocateControl'
 
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
 const DEFAULT_ZOOM = 16
@@ -16,6 +17,14 @@ const numberedMarkerIcon = (n: number) =>
     html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:#16a34a;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,.4);font-family:system-ui,sans-serif;line-height:1">${n}</div>`,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
+  })
+
+const userLocationIcon = () =>
+  Leaflet.divIcon({
+    className: '',
+    html: `<div style="width:18px;height:18px;background:#0288D1;border:3px solid #fff;border-radius:9999px;box-shadow:0 0 0 4px rgba(2,136,209,.35)"></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
   })
 
 interface MapPolygonEditorProps {
@@ -30,14 +39,29 @@ function MapClickHandler({ onClick }: { onClick: (e: Leaflet.LeafletMouseEvent) 
   return null
 }
 
+function MapInstanceCapture({ onReady }: { onReady: (map: Leaflet.Map) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    onReady(map)
+  }, [map, onReady])
+  return null
+}
+
 function MapPolygonEditor({ onPolygonChange, initialPolygon }: MapPolygonEditorProps) {
   const [points, setPoints] = useState<number[][]>(initialPolygon || [])
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
+  const [map, setMap] = useState<Leaflet.Map | null>(null)
 
   useEffect(() => {
     if (initialPolygon) {
       setPoints(initialPolygon)
     }
   }, [initialPolygon])
+
+  const handleLocated = (lat: number, lng: number) => {
+    setUserLocation([lat, lng])
+    map?.flyTo([lat, lng], 17)
+  }
 
   const handleMapClick = (e: Leaflet.LeafletMouseEvent) => {
     if (points.length >= 50) return
@@ -62,41 +86,52 @@ function MapPolygonEditor({ onPolygonChange, initialPolygon }: MapPolygonEditorP
 
   return (
     <div className="relative">
-      <MapContainer
-        center={DEFAULT_CENTER}
-        zoom={DEFAULT_ZOOM}
-        className="h-80 w-full rounded-lg border border-gray-300"
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <MapClickHandler onClick={handleMapClick} />
-        {points.length > 0 && (
-          <>
-            <Polygon
-              positions={points.map(([lng, lat]) => [lat, lng] as [number, number])}
-              pathOptions={{
-                color: '#16a34a',
-                weight: 2,
-                fillColor: '#16a34a',
-                fillOpacity: 0.15,
-              }}
-            />
-            {points.map(([lng, lat], index) => (
-              <Marker
-                key={`${index}-${lng}-${lat}`}
-                position={[lat, lng] as [number, number]}
-                icon={numberedMarkerIcon(index + 1)}
-                draggable
-                eventHandlers={{
-                  dragend: e => handlePointDrag(index, e),
+      <div className="relative">
+        <MapContainer
+          center={DEFAULT_CENTER}
+          zoom={DEFAULT_ZOOM}
+          className="h-80 w-full rounded-lg border border-gray-300"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <MapInstanceCapture onReady={setMap} />
+          <MapClickHandler onClick={handleMapClick} />
+          {points.length > 0 && (
+            <>
+              <Polygon
+                positions={points.map(([lng, lat]) => [lat, lng] as [number, number])}
+                pathOptions={{
+                  color: '#16a34a',
+                  weight: 2,
+                  fillColor: '#16a34a',
+                  fillOpacity: 0.15,
                 }}
               />
-            ))}
-          </>
-        )}
-      </MapContainer>
+              {points.map(([lng, lat], index) => (
+                <Marker
+                  key={`${index}-${lng}-${lat}`}
+                  position={[lat, lng] as [number, number]}
+                  icon={numberedMarkerIcon(index + 1)}
+                  draggable
+                  eventHandlers={{
+                    dragend: e => handlePointDrag(index, e),
+                  }}
+                />
+              ))}
+            </>
+          )}
+          {userLocation && <Marker position={userLocation} icon={userLocationIcon()} />}
+        </MapContainer>
+        <LocateControl className="left-3 bottom-3" onLocated={handleLocated} />
+      </div>
+
+      {userLocation && (
+        <div className="mt-3 p-2.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm">
+          📍 Posisi Anda terdeteksi — klik titik-titik polygon di sekitar posisi ini
+        </div>
+      )}
 
       <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">

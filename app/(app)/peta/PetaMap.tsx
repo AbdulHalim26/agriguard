@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Polygon, Marker, Tooltip, useMap } from 'react-leaflet'
 import * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PetaLahan, PetaReport } from './actions'
 import { AI_STATUS_INFO, type AiStatus } from '@/lib/recommendations'
+import LocateControl from '@/components/map/LocateControl'
 
 const PIN_COLORS: Record<string, string> = {
   aman: '#16a34a',
@@ -51,6 +52,22 @@ function FitBounds({ lahan }: { lahan: PetaLahan[] }) {
   return null
 }
 
+function MapInstanceCapture({ onReady }: { onReady: (map: Leaflet.Map) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    onReady(map)
+  }, [map, onReady])
+  return null
+}
+
+const userLocationIcon = () =>
+  Leaflet.divIcon({
+    className: '',
+    html: `<div style="width:18px;height:18px;background:#0288D1;border:3px solid #fff;border-radius:9999px;box-shadow:0 0 0 4px rgba(2,136,209,.35)"></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  })
+
 export default function PetaMap({
   lahan,
   reports,
@@ -60,41 +77,55 @@ export default function PetaMap({
   reports: PetaReport[]
   onSelectReport: (report: PetaReport) => void
 }) {
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
+  const [map, setMap] = useState<Leaflet.Map | null>(null)
+
+  const handleLocated = (lat: number, lng: number) => {
+    setUserLocation([lat, lng])
+    map?.flyTo([lat, lng], 17)
+  }
+
   return (
-    <MapContainer
-      center={[-6.312, 107.285]}
-      zoom={14}
-      className="h-[70vh] w-full"
-      scrollWheelZoom
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <FitBounds lahan={lahan} />
+    <div className="relative">
+      <MapContainer
+        center={[-6.312, 107.285]}
+        zoom={14}
+        className="h-[70vh] w-full"
+        scrollWheelZoom
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapInstanceCapture onReady={setMap} />
+        <FitBounds lahan={lahan} />
 
-      {lahan.map((l) => (
-        <Polygon
-          key={l.id}
-          positions={l.polygon.map(([lng, lat]) => [lat, lng] as [number, number])}
-          pathOptions={{ color: '#16a34a', weight: 2, fillColor: '#16a34a', fillOpacity: 0.08 }}
-        >
-          <Tooltip>{l.name}</Tooltip>
-        </Polygon>
-      ))}
+        {lahan.map((l) => (
+          <Polygon
+            key={l.id}
+            positions={l.polygon.map(([lng, lat]) => [lat, lng] as [number, number])}
+            pathOptions={{ color: '#16a34a', weight: 2, fillColor: '#16a34a', fillOpacity: 0.08 }}
+          >
+            <Tooltip>{l.name}</Tooltip>
+          </Polygon>
+        ))}
 
-      {reports.map((r) => (
-        <Marker
-          key={r.id}
-          position={[r.latitude, r.longitude]}
-          icon={getPinIcon({ lat: r.latitude, lng: r.longitude }, r.ai_status)}
-          eventHandlers={{ click: () => onSelectReport(r) }}
-        >
-          <Tooltip>
-            {r.lahan_name || 'Lahan'} · {r.ai_status ? AI_STATUS_INFO[r.ai_status].label : 'Manual'}
-          </Tooltip>
-        </Marker>
-      ))}
-    </MapContainer>
+        {reports.map((r) => (
+          <Marker
+            key={r.id}
+            position={[r.latitude, r.longitude]}
+            icon={getPinIcon({ lat: r.latitude, lng: r.longitude }, r.ai_status)}
+            eventHandlers={{ click: () => onSelectReport(r) }}
+          >
+            <Tooltip>
+              {r.lahan_name || 'Lahan'} · {r.ai_status ? AI_STATUS_INFO[r.ai_status].label : 'Manual'}
+            </Tooltip>
+          </Marker>
+        ))}
+
+        {userLocation && <Marker position={userLocation} icon={userLocationIcon()} />}
+      </MapContainer>
+      <LocateControl className="left-3 bottom-3" onLocated={handleLocated} />
+    </div>
   )
 }
