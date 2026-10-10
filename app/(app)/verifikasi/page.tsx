@@ -5,7 +5,11 @@ import OfflineFallback from '@/components/features/OfflineFallback'
 
 export const dynamic = 'force-dynamic'
 
-export default async function VerifikasiPage() {
+export default async function VerifikasiPage({
+  searchParams,
+}: {
+  searchParams: { tab?: string }
+}) {
   let userId: string | null = null
   let fullName: string | null = null
   let role: string | null = null
@@ -47,6 +51,11 @@ export default async function VerifikasiPage() {
     redirect('/dashboard')
   }
 
+  const initialTab =
+    searchParams?.tab === 'reports' || searchParams?.tab === 'rekap'
+      ? searchParams.tab
+      : 'water'
+
   return (
     <div className="min-h-screen bg-gray-50 print:bg-white">
       <div className="max-w-4xl mx-auto px-4 py-8 print:px-0 print:py-0">
@@ -56,7 +65,7 @@ export default async function VerifikasiPage() {
             {role}
           </span>
         </div>
-        <VerifikasiContent />
+        <VerifikasiContent initialTab={initialTab} />
       </div>
     </div>
   )

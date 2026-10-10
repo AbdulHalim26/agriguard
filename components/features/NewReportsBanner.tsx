@@ -24,7 +24,7 @@ export default function NewReportsBanner() {
 
   return (
     <Link
-      href="/verifikasi"
+      href="/verifikasi?tab=reports"
       className="flex items-center gap-3 bg-[#ED6C02] text-white rounded-xl p-4 hover:bg-[#d96205] transition-colors"
     >
       <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center shrink-0">

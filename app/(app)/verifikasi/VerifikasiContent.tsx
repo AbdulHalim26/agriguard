@@ -1,13 +1,22 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import WaterLevelForm from '@/components/features/WaterLevelForm'
 import ReportVerification from '@/components/features/ReportVerification'
 import RekapLaporan from './RekapLaporan'
 
-export default function VerifikasiContent() {
+type TabKey = 'water' | 'reports' | 'rekap'
+
+export default function VerifikasiContent({ initialTab = 'water' }: { initialTab?: TabKey }) {
+  const [tab, setTab] = useState<TabKey>(initialTab)
+
+  useEffect(() => {
+    setTab(initialTab)
+  }, [initialTab])
+
   return (
-    <Tabs defaultValue="water" className="space-y-4">
+    <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="space-y-4">
       <TabsList className="grid w-full grid-cols-3 print:hidden">
         <TabsTrigger value="water">Tinggi Air</TabsTrigger>
         <TabsTrigger value="reports">Verifikasi Laporan</TabsTrigger>
