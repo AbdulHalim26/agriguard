@@ -48,9 +48,9 @@ export default async function VerifikasiPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-gray-50 print:bg-white">
+      <div className="max-w-4xl mx-auto px-4 py-8 print:px-0 print:py-0">
+        <div className="flex items-center justify-between mb-6 print:hidden">
           <h1 className="text-2xl font-bold text-gray-900">Verifikasi & Admin</h1>
           <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full capitalize">
             {role}

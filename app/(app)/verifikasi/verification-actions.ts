@@ -15,6 +15,10 @@ const verificationSchema = z.object({
 export interface VerificationReport {
   id: string
   lahan_name: string | null
+  lahan_area_hectares: number | null
+  poktan_name: string | null
+  village: string | null
+  district: string | null
   owner_name: string | null
   ai_status: AiStatus | null
   ai_confidence: number | null
@@ -65,7 +69,7 @@ export async function listVerificationReports(): Promise<{
   const { data: rows, error } = await supabase
     .from('damage_reports')
     .select(
-      '*, lahan(name), owner:profiles!damage_reports_user_id_fkey(full_name), verifier:profiles!damage_reports_verified_by_fkey(full_name)'
+      '*, lahan(name, area_hectares, poktan(name, village, district)), owner:profiles!damage_reports_user_id_fkey(full_name), verifier:profiles!damage_reports_verified_by_fkey(full_name)'
     )
     .order('server_created_at', { ascending: false })
     .limit(200)
@@ -87,6 +91,11 @@ export async function listVerificationReports(): Promise<{
     reports.push({
       id: row.id,
       lahan_name: row.lahan?.name ?? null,
+      lahan_area_hectares:
+        row.lahan?.area_hectares != null ? Number(row.lahan.area_hectares) : null,
+      poktan_name: row.lahan?.poktan?.name ?? null,
+      village: row.lahan?.poktan?.village ?? null,
+      district: row.lahan?.poktan?.district ?? null,
       owner_name: row.owner?.full_name ?? null,
       ai_status: row.ai_status ?? null,
       ai_confidence: row.ai_confidence != null ? Number(row.ai_confidence) : null,

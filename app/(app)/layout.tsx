@@ -75,7 +75,7 @@ export default function AppLayout({
     <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-black/50 lg:hidden transition-opacity ${
+        className={`fixed inset-0 z-40 bg-black/50 lg:hidden print:hidden transition-opacity ${
           sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setSidebarOpen(false)}
@@ -84,7 +84,7 @@ export default function AppLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Navigasi utama"
@@ -188,9 +188,9 @@ export default function AppLayout({
       <OfflineBanner />
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 print:pl-0">
         {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200">
+        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200 print:hidden">
           <div className="flex items-center justify-between h-16 px-4">
             <button
               className="p-2 text-gray-500 hover:text-gray-700"

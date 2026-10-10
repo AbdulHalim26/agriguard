@@ -10,7 +10,7 @@ export default function OfflineBanner() {
 
   return (
     <div
-      className="sticky top-0 z-40 bg-amber-500 text-white text-xs sm:text-sm px-4 py-2 text-center"
+      className="sticky top-0 z-40 bg-amber-500 text-white text-xs sm:text-sm px-4 py-2 text-center print:hidden"
       role="status"
       aria-live="polite"
     >
