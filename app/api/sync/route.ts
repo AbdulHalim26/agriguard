@@ -85,6 +85,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Idempotent: jika laporan (idempotency_key) sudah pernah tersimpan, jangan
+    // proses ulang. Ini juga menghindari jalur UPDATE RLS (upsert pada baris
+    // yang sudah ada) yang tidak diizinkan untuk petani -> tetap 200 tanpa duplikat.
+    const { data: existingByKey } = await supabase
+      .from('damage_reports')
+      .select('id')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle()
+
+    if (existingByKey) {
+      return NextResponse.json({ success: true, id: existingByKey.id })
+    }
+
     // Process photos
     const photos: File[] = []
     for (const [key, value] of Array.from(formData.entries())) {
@@ -155,7 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert report (upsert by idempotency_key)
-    const { error: reportError } = await supabase
+    const { data: inserted, error: reportError } = await supabase
       .from('damage_reports')
       .upsert({
         idempotency_key: idempotencyKey,
@@ -172,6 +185,8 @@ export async function POST(request: NextRequest) {
       }, {
         onConflict: 'idempotency_key',
       })
+      .select('id')
+      .single()
 
     if (reportError) {
       return NextResponse.json(
@@ -180,18 +195,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Audit log
+    // Audit log (entity_id = id laporan sebenarnya, bukan idempotency_key)
     await admin
       .from('audit_logs')
       .insert({
         actor_id: user.id,
         action: 'submit_report',
         entity: 'damage_reports',
-        entity_id: idempotencyKey,
+        entity_id: inserted.id,
         meta: { lahan_id: lahanId, ai_status: aiStatus },
       })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, id: inserted.id })
   } catch (error) {
     console.error('Sync error:', error)
     return NextResponse.json(
