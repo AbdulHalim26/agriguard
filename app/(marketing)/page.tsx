@@ -1,60 +1,64 @@
+import { Fragment } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import {
+  Leaf,
   ArrowRight,
-  Smartphone,
-  MapPinned,
-  BellRing,
-  Camera,
   ImageUp,
-  PackageCheck,
   Cpu,
-  BadgeCheck,
+  ClipboardList,
+  Sprout,
+  Camera,
+  ScanSearch,
+  Gauge,
   Lightbulb,
   Waves,
-  WifiOff,
-  ShieldCheck,
+  Sparkles,
+  Smartphone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const STEPS = [
+const NAVY = 'text-[#0B2545]'
+
+const HOW_STEPS = [
   {
-    icon: Smartphone,
-    title: 'Daftar dengan Nomor HP',
-    description: 'Tanpa email, tanpa ribet. Verifikasi lewat OTP sekali saja.',
+    icon: ImageUp,
+    title: 'Upload Foto',
+    description: 'Ambil foto daun atau sawah langsung dari kamera ponsel Anda.',
   },
   {
-    icon: MapPinned,
-    title: 'Tandai Lahan Anda',
-    description: 'Gambar area sawah di peta agar peringatan benar-benar hiper-lokal.',
+    icon: Cpu,
+    title: 'AI Menganalisis',
+    description: 'Model computer vision memeriksa foto dan mengukur tingkat kerusakan.',
   },
   {
-    icon: BellRing,
-    title: 'Terima Peringatan Dini',
-    description: 'Status hijau–kuning–merah dari curah hujan dan tinggi air di sekitar lahan.',
+    icon: ClipboardList,
+    title: 'Hasil & Laporan',
+    description: 'Anda menerima hasil analisis sekaligus laporan yang tercatat rapi.',
   },
   {
-    icon: Camera,
-    title: 'Foto & Laporkan',
-    description: 'AI menilai tingkat kerusakan; laporan diteruskan ke PPL dan Dinas.',
+    icon: Sprout,
+    title: 'Tindakan',
+    description: 'Ikuti rekomendasi penanganan sesuai tingkat keparahan lahan.',
   },
 ]
 
 const AI_STEPS = [
-  { icon: ImageUp, title: 'Unggah foto', description: 'Ambil foto daun atau sawah langsung dari kamera.' },
-  { icon: PackageCheck, title: 'Kompres di perangkat', description: 'Foto diperkecil agar hemat kuota, tetap bisa offline.' },
-  { icon: Cpu, title: 'Analisis model AI', description: 'Model EfficientNet-B0 memproses gambar di server.' },
-  { icon: BadgeCheck, title: 'Klasifikasi kerusakan', description: 'Hasil: Aman, Rusak Ringan, atau Rusak Berat + confidence.' },
-  { icon: Lightbulb, title: 'Rekomendasi tindakan', description: 'Langkah penanganan yang disesuaikan dengan tingkat kerusakan.' },
+  { icon: Camera, title: 'Foto Lahan', description: 'Gambar padi atau sawah dari jarak jelas.' },
+  { icon: Cpu, title: 'YOLO / CNN', description: 'Model mendeteksi objek dan pola kerusakan.' },
+  { icon: ScanSearch, title: 'Deteksi Kerusakan', description: 'Menandai area daun yang bermasalah.' },
+  { icon: Gauge, title: 'Skor Kerusakan', description: 'Menghitung persentase tingkat kerusakan.' },
+  { icon: Lightbulb, title: 'Rekomendasi', description: 'Saran tindakan yang bisa langsung dilakukan.' },
 ]
 
 const TRUST = [
-  { icon: Waves, label: 'Peringatan banjir hiper-lokal' },
-  { icon: WifiOff, label: 'Bekerja tanpa sinyal' },
-  { icon: ShieldCheck, label: 'Verifikasi PPL & Dinas' },
+  { icon: Waves, label: 'Deteksi Dini' },
+  { icon: Sparkles, label: 'Rekomendasi AI' },
+  { icon: Smartphone, label: 'Mudah Digunakan' },
+  { icon: Sprout, label: 'Mendukung Ketahanan Pangan' },
 ]
 
 export default async function BerandaPage() {
@@ -78,103 +82,134 @@ export default async function BerandaPage() {
   }
 
   return (
-    <>
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0">
-          <Image
-            src="/ilustrations/hero-rice.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
+    <div className="bg-[#F8F9FA]">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-10 sm:pb-14">
+        <div className="relative bg-white rounded-3xl border border-gray-100 shadow-[0_18px_50px_-24px_rgba(11,37,69,0.28)] overflow-hidden">
+          <div
+            className="pointer-events-none absolute -top-16 -left-16 w-56 h-56 rounded-full bg-green-100/70 blur-2xl"
+            aria-hidden="true"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0f3d13]/95 via-[#1B5E20]/85 to-[#2E7D32]/40" />
-        </div>
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-28 text-white">
-          <div className="max-w-2xl">
-            <span className="inline-block px-3 py-1 rounded-full bg-white/15 text-green-50 text-xs font-semibold mb-4 backdrop-blur">
-              Peringatan dini banjir untuk sawah Anda
-            </span>
-            <h1 className="text-3xl sm:text-5xl font-bold leading-tight mb-4">
-              Lindungi sawah dari banjir,{' '}
-              <span className="text-green-300">sebelum air datang.</span>
-            </h1>
-            <p className="text-green-50/90 text-base sm:text-lg mb-8">
-              AgriGuard memadukan prakiraan cuaca, pantauan tinggi air, dan deteksi kerusakan
-              dengan AI — siap dipakai petani, PPL, maupun Dinas Pertanian, bahkan tanpa sinyal.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center gap-2 min-h-[52px] px-6 py-3 bg-white text-[#1B5E20] font-semibold rounded-xl hover:bg-green-50 transition-colors"
-              >
-                Daftar / Masuk
-                <ArrowRight size={18} aria-hidden="true" />
-              </Link>
-              <Link
-                href="/fitur"
-                className="inline-flex items-center justify-center min-h-[52px] px-6 py-3 border border-white/40 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors"
-              >
-                Lihat Fitur
-              </Link>
+          <div
+            className="pointer-events-none absolute -bottom-20 -right-10 w-64 h-64 rounded-full bg-green-50 blur-2xl"
+            aria-hidden="true"
+          />
+          <div className="relative grid lg:grid-cols-2 gap-8 lg:gap-6 items-center p-6 sm:p-10 lg:p-12">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-[#2E7D32] text-xs font-semibold mb-4">
+                <Leaf size={13} aria-hidden="true" /> Teknologi Cerdas untuk Sawah
+              </span>
+              <h1 className={`text-3xl sm:text-4xl lg:text-[2.75rem] font-bold leading-tight mb-4 ${NAVY}`}>
+                Deteksi Kerusakan Lahan Padi Lebih Cepat dengan AI
+              </h1>
+              <p className="text-base sm:text-lg text-[#2E7D32] mb-8">
+                Foto sawah Anda dan biarkan AgriGuard menganalisis tingkat kerusakan, memberi skor,
+                serta rekomendasi tindakan — bahkan saat sinyal terbatas.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center justify-center gap-2 min-h-[52px] px-6 py-3 text-white font-semibold rounded-xl brand-gradient transition-colors"
+                >
+                  <Leaf size={18} aria-hidden="true" /> Mulai Analisis Lahan
+                </Link>
+                <Link
+                  href="/cara-kerja"
+                  className="inline-flex items-center justify-center gap-2 min-h-[52px] px-6 py-3 border border-[#2E7D32] text-[#2E7D32] font-semibold rounded-xl hover:bg-green-50 transition-colors"
+                >
+                  Pelajari lebih lanjut
+                </Link>
+              </div>
+            </div>
+
+            <div className="relative h-64 sm:h-80 lg:h-[26rem] organic-photo shadow-lg">
+              <Image
+                src="/ilustrations/hero-rice.jpg"
+                alt="Lahan padi hijau"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Mulai dalam 4 langkah</h2>
-        <p className="text-gray-600 mb-8">Dari daftar sampai laporan pertama, semuanya sederhana.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {STEPS.map((s, i) => (
-            <div key={s.title} className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center">
-                  <s.icon size={22} className="text-[#2E7D32]" aria-hidden="true" />
-                </div>
-                <span className="text-xs font-bold text-gray-300">LANGKAH {i + 1}</span>
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-14 sm:pb-20">
+        <h2 className={`text-xl sm:text-2xl font-bold mb-8 ${NAVY}`}>Bagaimana Cara Kerjanya?</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
+          {HOW_STEPS.map((s, i) => (
+            <div
+              key={s.title}
+              className={`bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_12px_30px_-20px_rgba(11,37,69,0.35)] transition-transform ${
+                i % 2 === 0 ? 'lg:-translate-y-3' : 'lg:translate-y-3'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                <s.icon size={24} className="text-[#2E7D32]" aria-hidden="true" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1.5">{s.title}</h3>
+              <h3 className={`font-semibold mb-1.5 ${NAVY}`}>{s.title}</h3>
               <p className="text-sm text-gray-600 leading-relaxed">{s.description}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="bg-white border-y border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-            Proses AI dalam 5 langkah
-          </h2>
-          <p className="text-gray-600 mb-8">
-            Dari foto yang Anda kirim sampai rekomendasi tindakan, hanya dalam hitungan detik.
-          </p>
-          <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-14 sm:pb-20">
+        <div className="soft-green-panel rounded-3xl px-6 py-10 sm:px-10 sm:py-14">
+          <div className="max-w-2xl mb-10">
+            <h2 className={`text-xl sm:text-2xl font-bold mb-3 ${NAVY}`}>Di Balik Hasil Analisis</h2>
+            <p className="text-gray-600">
+              Setiap laporan melewati serangkaian proses yang konsisten, dari foto hingga rekomendasi
+              yang bisa Anda tindak lanjuti.
+            </p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2">
             {AI_STEPS.map((s, i) => (
-              <li key={s.title} className="relative bg-[#F8F9FA] rounded-2xl border border-gray-200 p-5">
-                <span className="absolute -top-3 -left-2 w-8 h-8 rounded-full bg-[#2E7D32] text-white text-sm font-bold flex items-center justify-center shadow">
-                  {i + 1}
-                </span>
-                <s.icon size={22} className="text-[#2E7D32] mb-3" aria-hidden="true" />
-                <h3 className="font-semibold text-gray-900 text-sm mb-1">{s.title}</h3>
-                <p className="text-xs text-gray-600 leading-relaxed">{s.description}</p>
-              </li>
+              <Fragment key={s.title}>
+                <div className="flex-1 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-3">
+                    <s.icon size={20} className="text-[#2E7D32]" aria-hidden="true" />
+                  </div>
+                  <p className={`font-semibold text-sm mb-1 ${NAVY}`}>{s.title}</p>
+                  <p className="text-xs text-gray-600 leading-relaxed">{s.description}</p>
+                </div>
+                {i < AI_STEPS.length - 1 && (
+                  <div className="hidden lg:flex items-center justify-center text-[#2E7D32]" aria-hidden="true">
+                    <ArrowRight size={20} />
+                  </div>
+                )}
+              </Fragment>
             ))}
-          </ol>
+          </div>
+
+          <div className="flex justify-center mt-10">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 min-h-[52px] px-6 py-3 text-white font-semibold rounded-xl brand-gradient transition-colors"
+            >
+              Mulai Analisis Sekarang
+              <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#2E7D32] text-white rounded-2xl px-6 py-6">
-          {TRUST.map((t) => (
-            <div key={t.label} className="flex items-center gap-3">
-              <t.icon size={22} className="text-green-200" aria-hidden="true" />
-              <span className="text-sm font-medium">{t.label}</span>
-            </div>
-          ))}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
+        <div className="soft-green-panel rounded-full px-6 py-5 sm:px-10 sm:py-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {TRUST.map((t) => (
+              <div key={t.label} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
+                  <t.icon size={18} className="text-[#2E7D32]" aria-hidden="true" />
+                </div>
+                <span className="text-sm font-medium text-[#0B2545]">{t.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
-    </>
+    </div>
   )
 }

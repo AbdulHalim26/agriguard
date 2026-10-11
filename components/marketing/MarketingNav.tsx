@@ -15,38 +15,48 @@ export default function MarketingNav() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-100">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
         <Link href="/" className="flex items-center shrink-0" aria-label="AgriGuard — Beranda">
           <BrandLogo variant="color" size="md" className="sm:hidden" showText={false} />
           <BrandLogo variant="color" size="md" className="hidden sm:inline-flex" />
         </Link>
 
-        <nav className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto">
+        <nav className="flex-1 flex items-center justify-center gap-1 overflow-x-auto" aria-label="Navigasi">
           {LINKS.map((l) => {
             const active = l.href === '/' ? pathname === '/' : pathname.startsWith(l.href)
             return (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
-                  active
-                    ? 'text-[#2E7D32] bg-green-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                className={`relative px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                  active ? 'text-[#2E7D32] font-semibold' : 'text-gray-600 hover:text-gray-900'
                 }`}
+                aria-current={active ? 'page' : undefined}
               >
                 {l.label}
+                {active && (
+                  <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-[#2E7D32]" aria-hidden="true" />
+                )}
               </Link>
             )
           })}
         </nav>
 
-        <Link
-          href="/login"
-          className="shrink-0 inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-sm font-semibold text-white bg-[#2E7D32] hover:bg-[#276b2a] rounded-lg transition-colors"
-        >
-          Masuk
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/login"
+            className="hidden sm:inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-sm font-semibold text-[#2E7D32] border border-[#2E7D32] rounded-lg hover:bg-green-50 transition-colors"
+          >
+            Login
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-sm font-semibold text-white brand-gradient rounded-lg transition-colors"
+          >
+            Daftar
+          </Link>
+        </div>
       </div>
     </header>
   )
