@@ -27,6 +27,7 @@ export type AiStatus = 'aman' | 'rusak_ringan' | 'rusak_berat'
 export interface ReportItem {
   id: string
   lahan: { id: string; name: string } | null
+  district: string | null
   ai_status: AiStatus | null
   ai_confidence: number | null
   ai_damage_pct: number | null
@@ -230,7 +231,7 @@ export async function listMyReports(): Promise<{
 
   const { data: rows, error } = await supabase
     .from('damage_reports')
-    .select('*, lahan(id, name)')
+    .select('*, lahan(id, name, poktan(district))')
     .eq('user_id', user.id)
     .order('server_created_at', { ascending: false })
 
@@ -241,7 +242,8 @@ export async function listMyReports(): Promise<{
 
   const reports: ReportItem[] = (rows || []).map((row: any) => ({
     id: row.id,
-    lahan: row.lahan || null,
+    lahan: row.lahan ? { id: row.lahan.id, name: row.lahan.name } : null,
+    district: row.lahan?.poktan?.district ?? null,
     ai_status: row.ai_status ?? null,
     ai_confidence: row.ai_confidence != null ? Number(row.ai_confidence) : null,
     ai_damage_pct: row.ai_damage_pct != null ? Number(row.ai_damage_pct) : null,
