@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import AutoSync from '@/components/AutoSync'
 import OfflineBanner from '@/components/features/OfflineBanner'
@@ -20,6 +22,10 @@ import {
   X,
   ChevronDown,
   User,
+  Bell,
+  Settings,
+  Wifi,
+  WifiOff,
 } from 'lucide-react'
 
 const navigation = [
@@ -28,6 +34,7 @@ const navigation = [
   { name: 'Scan Tanaman', href: '/scan', icon: Camera },
   { name: 'Laporan Saya', href: '/laporan', icon: FileText },
   { name: 'Peta', href: '/peta', icon: Map },
+  { name: 'Notifikasi', href: '/notifikasi', icon: Bell },
 ]
 
 const adminNavigation = [
@@ -44,13 +51,27 @@ export default function AppLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userRole, setUserRole] = useState<'petani' | 'ppl' | 'dinas' | null>(null)
   const [userName, setUserName] = useState('')
+  const [poktanName, setPoktanName] = useState('')
+  const [online, setOnline] = useState(true)
 
   // Tutup drawer mobile setiap kali rute berubah
   useEffect(() => {
     setSidebarOpen(false)
   }, [pathname])
 
-  // Fetch user role on mount
+  // Status koneksi (badge Online/Offline)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    update()
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+
+  // Fetch user role + nama poktan
   useEffect(() => {
     const fetchUser = async () => {
       const supabase = createClient()
@@ -58,12 +79,20 @@ export default function AppLayout({
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, role')
+          .select('full_name, role, poktan_id')
           .eq('id', user.id)
           .single()
         if (profile) {
           setUserName(profile.full_name)
           setUserRole(profile.role)
+          if (profile.poktan_id) {
+            const { data: poktan } = await supabase
+              .from('poktan')
+              .select('name')
+              .eq('id', profile.poktan_id)
+              .single()
+            if (poktan?.name) setPoktanName(poktan.name)
+          }
         }
       }
     }
@@ -76,11 +105,32 @@ export default function AppLayout({
     window.location.href = '/login'
   }
 
-  const isAdminRoute = pathname.startsWith('/verifikasi')
   const showAdminNav = userRole === 'ppl' || userRole === 'dinas'
+  const roleLabel = userRole === 'ppl' ? 'Petugas PPL' : userRole === 'dinas' ? 'Dinas Pertanian' : 'Petani'
+  const initials = (userName || 'P').trim().charAt(0).toUpperCase()
+
+  const activeClass = 'bg-white/15 text-white border-l-4 border-white'
+  const idleClass = 'text-white/80 hover:bg-white/10 hover:text-white border-l-4 border-transparent'
+
+  const renderNavItem = (item: (typeof navigation)[number]) => {
+    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+    return (
+      <Link
+        key={item.name}
+        href={item.href}
+        className={`flex items-center gap-3 pl-3 pr-3 py-2.5 min-h-[48px] rounded-r-lg text-sm font-medium transition-colors ${
+          isActive ? activeClass : idleClass
+        }`}
+        aria-current={isActive ? 'page' : undefined}
+      >
+        <item.icon size={20} aria-hidden="true" />
+        {item.name}
+      </Link>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Mobile sidebar overlay */}
       <div
         className={`fixed inset-0 z-40 bg-black/50 lg:hidden print:hidden transition-opacity ${
@@ -92,102 +142,91 @@ export default function AppLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
+        id="sidebar"
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-[#2E7D32] via-[#2E7D32] to-[#1B5E20] shadow-xl transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Navigasi utama"
       >
         <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AG</span>
-              </div>
-              <span className="font-semibold text-gray-900">AgriGuard</span>
-            </Link>
-            <div className="flex items-center gap-1">
-              {showAdminNav && <PendingReportsBadge />}
-              <button
-                className="lg:hidden p-2 text-gray-500 hover:text-gray-700"
-                onClick={() => setSidebarOpen(false)}
-                aria-label="Tutup menu"
-              >
-                <X size={24} />
-              </button>
+          {/* Brand */}
+          <div className="px-5 pt-6 pb-4 flex items-start justify-between">
+            <div>
+              <Image
+                src="/logo-white.png"
+                alt="AgriGuard"
+                width={150}
+                height={40}
+                className="h-9 w-auto"
+                priority
+              />
+              <p className="mt-2 text-[11px] leading-snug text-white/75 max-w-[190px]">
+                Teknologi Cerdas untuk Sawah yang Lebih Terjaga
+              </p>
             </div>
+            <button
+              className="lg:hidden p-2 -mr-1 text-white/80 hover:text-white"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Tutup menu"
+            >
+              <X size={22} />
+            </button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Menu navigasi">
-            {navigation.map(item => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 min-h-[48px] rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-green-50 text-green-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <item.icon size={20} aria-hidden="true" />
-                  {item.name}
-                </Link>
-              )
-            })}
+          <nav className="flex-1 px-0 py-2 overflow-y-auto" aria-label="Menu navigasi">
+            {navigation.map(renderNavItem)}
 
             {showAdminNav && (
-              <>
-                <div className="pt-4 mt-2 border-t border-gray-200">
-                  <h3 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Admin
-                  </h3>
-                  {adminNavigation.map(item => {
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 min-h-[48px] rounded-lg text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-green-50 text-green-700'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        }`}
-                        aria-current={isActive ? 'page' : undefined}
-                      >
-                        <item.icon size={20} aria-hidden="true" />
-                        {item.name}
-                      </Link>
-                    )
-                  })}
-                </div>
-              </>
+              <div className="pt-4 mt-2 border-t border-white/15">
+                <h3 className="px-4 text-[11px] font-semibold text-white/60 uppercase tracking-wider mb-1">
+                  Admin
+                </h3>
+                {adminNavigation.map(renderNavItem)}
+              </div>
             )}
+
+            <div className="pt-2 mt-2 border-t border-white/15">
+              <Link
+                href="/settings"
+                className={`flex items-center gap-3 pl-3 pr-3 py-2.5 min-h-[48px] rounded-r-lg text-sm font-medium transition-colors ${
+                  pathname.startsWith('/settings') ? activeClass : idleClass
+                }`}
+              >
+                <Settings size={20} aria-hidden="true" />
+                Pengaturan
+              </Link>
+            </div>
           </nav>
 
-          {/* User menu */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <User size={16} className="text-green-600" aria-hidden="true" />
+          {/* Illustration */}
+          <div className="px-4 pb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/ilustrations/sidebar.png"
+              alt=""
+              className="w-full h-auto rounded-xl opacity-90"
+            />
+          </div>
+
+          {/* User */}
+          <div className="px-4 py-4 border-t border-white/15">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+                <User size={16} className="text-white" aria-hidden="true" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{userName || 'Petani'}</p>
-                <p className="text-xs text-gray-500 capitalize">{userRole || 'petani'}</p>
+                <p className="text-sm font-medium text-white truncate">{userName || 'Petani'}</p>
+                <p className="text-xs text-white/70">{roleLabel}</p>
               </div>
             </div>
-            <div className="mt-2 space-y-1">
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-3 py-2 min-h-[48px] text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut size={20} aria-hidden="true" />
-                Keluar
-              </button>
-            </div>
+            <button
+              onClick={handleSignOut}
+              className="mt-3 w-full flex items-center gap-3 px-3 py-2 min-h-[44px] text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <LogOut size={18} aria-hidden="true" />
+              Keluar
+            </button>
           </div>
         </div>
       </aside>
@@ -199,12 +238,12 @@ export default function AppLayout({
       <OfflineBanner />
 
       {/* Main content */}
-      <div className="lg:pl-64 print:pl-0">
-        {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200 print:hidden">
-          <div className="flex items-center justify-between h-16 px-4">
+      <div className="lg:pl-72 print:pl-0">
+        {/* Header */}
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200 print:hidden">
+          <div className="flex items-center gap-3 h-16 px-4 lg:px-6">
             <button
-              className="p-2 text-gray-500 hover:text-gray-700"
+              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 touch-target"
               onClick={() => setSidebarOpen(true)}
               aria-label="Buka menu"
               aria-expanded={sidebarOpen}
@@ -212,12 +251,80 @@ export default function AppLayout({
             >
               <Menu size={24} />
             </button>
-            <span className="font-semibold text-gray-900">AgriGuard</span>
-            {showAdminNav ? <PendingReportsBadge /> : <div className="w-10" />}
+
+            <div className="flex-1 min-w-0">
+              <p className="text-sm sm:text-base font-semibold text-gray-900 truncate">
+                Halo, {userName || 'Petani'}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{poktanName || roleLabel}</p>
+            </div>
+
+            {showAdminNav && <PendingReportsBadge />}
+
+            {/* Badge Online/Offline */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                online ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {online ? <Wifi size={13} aria-hidden="true" /> : <WifiOff size={13} aria-hidden="true" />}
+              <span className="hidden sm:inline">{online ? 'Online' : 'Offline'}</span>
+            </span>
+
+            {/* Avatar dropdown */}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  className="flex items-center gap-1.5 rounded-full p-0.5 hover:bg-gray-100 transition-colors"
+                  aria-label="Menu profil"
+                >
+                  <span className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center font-semibold text-sm">
+                    {initials}
+                  </span>
+                  <ChevronDown size={16} className="text-gray-400 hidden sm:block" aria-hidden="true" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  align="end"
+                  sideOffset={8}
+                  className="z-50 min-w-[200px] bg-white rounded-xl border border-gray-200 shadow-lg p-1.5"
+                >
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-medium text-gray-900 truncate">{userName || 'Petani'}</p>
+                    <p className="text-xs text-gray-500">{roleLabel}</p>
+                  </div>
+                  <DropdownMenu.Separator className="h-px bg-gray-100 my-1" />
+                  <DropdownMenu.Item asChild>
+                    <Link
+                      href="/settings"
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded-lg outline-none cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+                    >
+                      <Settings size={16} aria-hidden="true" /> Pengaturan
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link
+                      href="/notifikasi"
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded-lg outline-none cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+                    >
+                      <Bell size={16} aria-hidden="true" /> Notifikasi
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Separator className="h-px bg-gray-100 my-1" />
+                  <DropdownMenu.Item
+                    onSelect={handleSignOut}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 rounded-lg outline-none cursor-pointer hover:bg-red-50 focus:bg-red-50"
+                  >
+                    <LogOut size={16} aria-hidden="true" /> Keluar
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
         </header>
 
-        <main className="pt-4 lg:pt-0">{children}</main>
+        <main className="p-4 lg:p-6 print:p-0">{children}</main>
       </div>
     </div>
   )
