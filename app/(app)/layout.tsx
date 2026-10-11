@@ -143,12 +143,28 @@ export default function AppLayout({
       {/* Sidebar */}
       <aside
         id="sidebar"
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-[#2E7D32] via-[#2E7D32] to-[#1B5E20] shadow-xl transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 overflow-hidden bg-gradient-to-b from-[#2E7D32] via-[#2E7D32] to-[#1B5E20] shadow-xl transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Navigasi utama"
       >
-        <div className="flex flex-col h-full">
+        {/* Ilustrasi full-bleed di dasar sidebar — mask fade ke atas agar
+            menyatu dengan warna sidebar (tanpa kartu/rounded/margin). */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/ilustrations/sidebar.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 left-0 w-full h-auto select-none"
+          style={{
+            WebkitMaskImage:
+              'linear-gradient(to top, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%)',
+            maskImage:
+              'linear-gradient(to top, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%)',
+          }}
+        />
+
+        <div className="relative z-10 flex flex-col h-full">
           {/* Brand */}
           <div className="px-5 pt-6 pb-4 flex items-start justify-between">
             <div>
@@ -192,24 +208,9 @@ export default function AppLayout({
             </div>
           </nav>
 
-          {/* Illustration — mask fade menyatu dengan warna sidebar */}
-          <div className="px-4 pb-3" aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/ilustrations/sidebar.png"
-              alt=""
-              className="w-full h-auto rounded-xl"
-              style={{
-                WebkitMaskImage:
-                  'linear-gradient(to bottom, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 100%)',
-                maskImage:
-                  'linear-gradient(to bottom, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 100%)',
-              }}
-            />
-          </div>
-
-          {/* User */}
-          <div className="px-4 py-4 border-t border-white/15">
+          {/* User — scrim halus menyatu dengan warna sidebar agar teks tetap
+              terbaca di atas ilustrasi (bukan kotak/border). */}
+          <div className="px-4 py-4 border-t border-white/15 bg-gradient-to-t from-[#1B5E20] via-[#1B5E20]/85 to-transparent">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center shrink-0">
                 <User size={16} className="text-white" aria-hidden="true" />
