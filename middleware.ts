@@ -159,7 +159,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Protected routes - redirect to login if not authenticated
-    const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi']
+    const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi', '/notifikasi', '/settings']
     const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
     if (isProtectedRoute && !user) {
