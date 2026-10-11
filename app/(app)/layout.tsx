@@ -192,13 +192,19 @@ export default function AppLayout({
             </div>
           </nav>
 
-          {/* Illustration */}
-          <div className="px-4 pb-3">
+          {/* Illustration — mask fade menyatu dengan warna sidebar */}
+          <div className="px-4 pb-3" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/ilustrations/sidebar.png"
               alt=""
-              className="w-full h-auto rounded-xl opacity-90"
+              className="w-full h-auto rounded-xl"
+              style={{
+                WebkitMaskImage:
+                  'linear-gradient(to bottom, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 100%)',
+                maskImage:
+                  'linear-gradient(to bottom, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 100%)',
+              }}
             />
           </div>
 

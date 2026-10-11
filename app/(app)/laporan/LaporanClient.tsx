@@ -198,9 +198,9 @@ export default function LaporanClient() {
       </div>
 
       {/* 4 kartu statistik */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="soft-green-panel rounded-2xl p-3 sm:p-4 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((c) => (
-          <div key={c.label} className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5">
+          <div key={c.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
             <div className={`w-10 h-10 rounded-xl ${c.wrap} flex items-center justify-center mb-3`}>
               <c.icon size={20} className={c.color} aria-hidden="true" />
             </div>
@@ -224,7 +224,7 @@ export default function LaporanClient() {
       )}
 
       {/* Filter bar */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative sm:col-span-2 lg:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
@@ -285,7 +285,7 @@ export default function LaporanClient() {
       </div>
 
       {/* Tabel */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-6 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (

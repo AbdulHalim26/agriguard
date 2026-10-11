@@ -20,7 +20,7 @@ const TIPS = [
 
 export default function PhotoGuide() {
   return (
-    <aside className="bg-white rounded-2xl border border-gray-200 p-5 lg:sticky lg:top-20 h-fit">
+    <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 lg:sticky lg:top-20 h-fit">
       <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
         <Lightbulb size={18} className="text-[#ED6C02]" aria-hidden="true" /> Panduan Foto
       </h2>

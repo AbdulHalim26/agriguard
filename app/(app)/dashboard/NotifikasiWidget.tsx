@@ -15,7 +15,7 @@ export default function NotifikasiWidget({ userId }: { userId: string }) {
   const latest = items.slice(0, 3)
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <h2 className="font-semibold text-gray-900">Notifikasi</h2>
         <Link

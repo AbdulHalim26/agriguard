@@ -133,7 +133,7 @@ export default function LahanSummary({ userId }: { userId: string }) {
       {/* 4 kartu ringkasan lahan */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5">
+          <div key={c.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
             <div className={`w-10 h-10 rounded-xl ${c.iconBg} flex items-center justify-center mb-3`}>
               <c.icon size={20} className={c.iconColor} aria-hidden="true" />
             </div>
@@ -149,7 +149,7 @@ export default function LahanSummary({ userId }: { userId: string }) {
       </div>
 
       {/* Widget Kondisi Lahan */}
-      <div className="bg-white rounded-2xl border border-gray-200">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Kondisi Lahan</h2>
           <Link

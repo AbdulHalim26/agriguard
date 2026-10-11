@@ -70,7 +70,7 @@ export default function DashboardHero({
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-gradient-to-br from-[#2E7D32] to-[#43A047] p-6 sm:p-8 animate-pulse">
+      <div className="rounded-2xl brand-gradient p-6 sm:p-8 animate-pulse">
         <div className="h-5 w-40 bg-white/30 rounded mb-4" />
         <div className="h-10 w-56 bg-white/30 rounded mb-3" />
         <div className="h-4 w-72 max-w-full bg-white/20 rounded mb-5" />
@@ -110,7 +110,7 @@ export default function DashboardHero({
 
   return (
     <div
-      className={`rounded-2xl bg-gradient-to-br ${style.gradient} text-white p-6 sm:p-8 shadow-lg`}
+      className={`rounded-2xl ${style.bannerClass} text-white p-6 sm:p-8 shadow-lg`}
       role="region"
       aria-label="Status peringatan dini banjir"
     >

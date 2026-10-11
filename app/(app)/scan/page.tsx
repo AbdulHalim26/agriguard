@@ -363,7 +363,7 @@ export default function ScanPage() {
 
       {/* Bagian foto */}
       {!photo ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
             <div className="p-3 bg-gray-100 rounded-xl w-fit mx-auto mb-4">
               <Camera className="w-8 h-8 text-gray-500" aria-hidden="true" />
@@ -389,7 +389,7 @@ export default function ScanPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -501,7 +501,7 @@ export default function ScanPage() {
 
       {/* Form lengkapi laporan */}
       {photo && !analyzing && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
           <h2 className="text-lg font-semibold text-gray-900">Lengkapi Laporan</h2>
 
           <div>

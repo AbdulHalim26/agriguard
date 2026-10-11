@@ -58,7 +58,7 @@ export default function ScanTerbaru() {
   }, [])
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
           <History size={18} className="text-[#2E7D32]" aria-hidden="true" /> Scan Terbaru
