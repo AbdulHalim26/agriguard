@@ -4,29 +4,31 @@ type Variant = 'color' | 'white'
 type Size = 'sm' | 'md' | 'lg'
 
 const LOGO_HEIGHT: Record<Size, number> = { sm: 32, md: 40, lg: 72 }
-const TEXT_CLASS: Record<Size, string> = {
-  sm: 'text-base',
-  md: 'text-lg',
-  lg: 'text-2xl',
-}
 
+// Catatan: file logo (logo.png / logo-white.png) SUDAH memuat daun + teks
+// "AgriGuard", jadi komponen ini TIDAK boleh menambahkan teks lagi (agar tidak
+// tampil dobel). Untuk kebutuhan logo tanpa teks (ikon saja), pakai iconOnly
+// -> icons/icon-512.png.
 export default function BrandLogo({
   variant = 'color',
   size = 'md',
-  showText = true,
+  iconOnly = false,
   className = '',
 }: {
   variant?: Variant
   size?: Size
-  showText?: boolean
+  iconOnly?: boolean
   className?: string
 }) {
   const height = LOGO_HEIGHT[size]
-  const src = variant === 'white' ? '/logo-white.png' : '/logo.png'
-  const textColor = variant === 'white' ? 'text-white' : 'text-[#2E7D32]'
+  const src = iconOnly
+    ? '/icons/icon-512.png'
+    : variant === 'white'
+      ? '/logo-white.png'
+      : '/logo.png'
 
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span className={`inline-flex items-center ${className}`}>
       <Image
         src={src}
         alt="AgriGuard"
@@ -36,9 +38,6 @@ export default function BrandLogo({
         style={{ height, width: 'auto' }}
         priority
       />
-      {showText && (
-        <span className={`font-bold ${TEXT_CLASS[size]} ${textColor}`}>AgriGuard</span>
-      )}
     </span>
   )
 }

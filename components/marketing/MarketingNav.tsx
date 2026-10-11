@@ -18,7 +18,7 @@ export default function MarketingNav() {
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
         <Link href="/" className="flex items-center shrink-0" aria-label="AgriGuard — Beranda">
-          <BrandLogo variant="color" size="md" className="sm:hidden" showText={false} />
+          <BrandLogo variant="color" size="md" className="sm:hidden" iconOnly />
           <BrandLogo variant="color" size="md" className="hidden sm:inline-flex" />
         </Link>
 
