@@ -1,19 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import {
-  Camera,
-  MapPin,
-  FileText,
-  Plus,
-  ShieldCheck,
-  Map,
-  Printer,
-  History,
-} from 'lucide-react'
+import { ShieldCheck, Map, Printer, History } from 'lucide-react'
 import SyncWidget from '@/components/features/SyncWidget'
 import DashboardHero from './DashboardHero'
-import ReportSummary from './ReportSummary'
+import LahanSummary from './LahanSummary'
+import NotifikasiWidget from './NotifikasiWidget'
 import AdminStats from './AdminStats'
 import NewReportsBanner from '@/components/features/NewReportsBanner'
 
@@ -97,7 +89,7 @@ export default function DashboardContent({ userName, userId, demoMode, role }: D
             <Link
               key={a.label}
               href={a.href}
-              className="bg-white rounded-xl shadow border border-gray-200 p-5 hover:border-green-300 hover:shadow-md transition-all group"
+              className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-green-300 hover:shadow-md transition-all group"
             >
               <div
                 className={`w-12 h-12 ${a.iconBg} rounded-lg flex items-center justify-center mb-3 transition-colors`}
@@ -123,55 +115,11 @@ export default function DashboardContent({ userName, userId, demoMode, role }: D
       {/* Widget antrian offline (FR-03) */}
       <SyncWidget userId={userId} />
 
-      {/* Ringkasan laporan + status verifikasi */}
-      <ReportSummary userId={userId} />
+      {/* 4 kartu ringkasan + Kondisi Lahan */}
+      <LahanSummary userId={userId} />
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link
-          href="/scan"
-          className="bg-white rounded-xl shadow border border-gray-200 p-5 hover:border-green-300 hover:shadow-md transition-all group"
-        >
-          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-green-200 transition-colors">
-            <Camera size={24} className="text-green-600" aria-hidden="true" />
-          </div>
-          <h3 className="font-semibold text-gray-900 mb-1">Scan Tanaman</h3>
-          <p className="text-sm text-gray-500">Foto & analisis kerusakan padi dengan AI</p>
-        </Link>
-
-        <Link
-          href="/lahan"
-          className="bg-white rounded-xl shadow border border-gray-200 p-5 hover:border-green-300 hover:shadow-md transition-all group"
-        >
-          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
-            <MapPin size={24} className="text-blue-600" aria-hidden="true" />
-          </div>
-          <h3 className="font-semibold text-gray-900 mb-1">Lahan Saya</h3>
-          <p className="text-sm text-gray-500">Kelola data lahan & polygon sawah</p>
-        </Link>
-
-        <Link
-          href="/laporan"
-          className="bg-white rounded-xl shadow border border-gray-200 p-5 hover:border-green-300 hover:shadow-md transition-all group"
-        >
-          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-purple-200 transition-colors">
-            <FileText size={24} className="text-purple-600" aria-hidden="true" />
-          </div>
-          <h3 className="font-semibold text-gray-900 mb-1">Laporan Saya</h3>
-          <p className="text-sm text-gray-500">Riwayat laporan kerusakan & status sync</p>
-        </Link>
-
-        <Link
-          href="/peta"
-          className="bg-white rounded-xl shadow border border-gray-200 p-5 hover:border-green-300 hover:shadow-md transition-all group"
-        >
-          <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-orange-200 transition-colors">
-            <Plus size={24} className="text-orange-600" aria-hidden="true" />
-          </div>
-          <h3 className="font-semibold text-gray-900 mb-1">Peta & Laporan Baru</h3>
-          <p className="text-sm text-gray-500">Lihat peta lahan & buat laporan offline</p>
-        </Link>
-      </div>
+      {/* Widget notifikasi (3 terbaru) */}
+      <NotifikasiWidget userId={userId} />
 
       {demoBanner}
     </div>

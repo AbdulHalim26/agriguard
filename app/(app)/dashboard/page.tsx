@@ -44,15 +44,13 @@ export default async function DashboardPage() {
   const demoMode = (process.env.OTP_MODE || 'mock') === 'mock'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <DashboardContent
-          userName={fullName}
-          userId={userId}
-          demoMode={demoMode}
-          role={role}
-        />
-      </div>
+    <div className="max-w-5xl mx-auto">
+      <DashboardContent
+        userName={fullName}
+        userId={userId}
+        demoMode={demoMode}
+        role={role}
+      />
     </div>
   )
 }

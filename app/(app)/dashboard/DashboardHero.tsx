@@ -16,13 +16,9 @@ import { requestLocation } from '@/lib/location'
 import {
   RAIN_THRESHOLD_WASPADA_MM,
   WATER_LEVEL_THRESHOLD_BAHAYA_M,
+  STATUS_CONFIG,
+  STATUS_STYLE_FALLBACK,
 } from '@/lib/thresholds'
-
-const HERO_BG: Record<string, string> = {
-  green: 'from-[#2E7D32] to-[#43A047]',
-  yellow: 'from-[#ED6C02] to-[#F59E0B]',
-  red: 'from-[#D32F2F] to-[#E53935]',
-}
 
 const ICONS = {
   'check-circle': CheckCircle,
@@ -86,9 +82,9 @@ export default function DashboardHero({
     )
   }
 
-  const color = error || !data ? 'gray' : data.color
+  const style =
+    error || !data ? STATUS_STYLE_FALLBACK : STATUS_CONFIG[data.color === 'yellow' ? 'waspada' : data.color === 'red' ? 'bahaya' : 'aman']
   const IconComponent = data ? ICONS[data.icon] : AlertCircle
-  const bgClass = HERO_BG[color] ?? 'from-gray-500 to-gray-600'
 
   const rain = data?.rain_3h_mm ?? null
   const water = data?.water_level_m ?? null
@@ -104,7 +100,7 @@ export default function DashboardHero({
       warn: rainWarn,
     },
     {
-      label: 'Tinggi Air Sungai',
+      label: 'Tinggi Air',
       value: water !== null ? water.toFixed(2) : '—',
       unit: 'm',
       icon: Droplets,
@@ -114,40 +110,36 @@ export default function DashboardHero({
 
   return (
     <div
-      className={`rounded-2xl bg-gradient-to-br ${bgClass} text-white p-6 sm:p-8 shadow-lg`}
+      className={`rounded-2xl bg-gradient-to-br ${style.gradient} text-white p-6 sm:p-8 shadow-lg`}
       role="region"
       aria-label="Status peringatan dini banjir"
     >
-      <p className="text-white/85 text-sm mb-1">Selamat datang, {userName}!</p>
-
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-          <IconComponent size={26} aria-hidden="true" />
+      <div className="flex items-center gap-4">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+          <IconComponent size={40} aria-hidden="true" />
         </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-white/80">
+        <div className="min-w-0">
+          <p className="text-[11px] sm:text-xs uppercase tracking-widest text-white/80 font-semibold">
             Status Banjir Wilayah
           </p>
-          <p className="text-2xl sm:text-3xl font-bold leading-tight">
+          <p className="text-3xl sm:text-4xl font-extrabold leading-tight">
             {error || !data ? 'Tidak Diketahui' : data.label}
           </p>
         </div>
       </div>
 
-      <p className="text-white/90 text-sm max-w-xl mb-5">
+      <p className="mt-3 text-white/90 text-sm max-w-xl">
         {error
           ? 'Data cuaca dan tinggi air belum dapat dimuat. Periksa koneksi lalu coba lagi.'
           : data?.description}
       </p>
 
-      <div className="grid grid-cols-2 gap-3 max-w-sm mb-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 max-w-md">
         {indicators.map((ind) => (
           <div
             key={ind.label}
-            className={`rounded-xl px-3 py-2.5 ${
-              ind.warn
-                ? 'bg-white/25 ring-1 ring-white/60'
-                : 'bg-white/10'
+            className={`rounded-xl px-4 py-3 ${
+              ind.warn ? 'bg-white/25 ring-1 ring-white/60' : 'bg-white/10'
             }`}
           >
             <div className="flex items-center gap-1.5 text-[11px] text-white/80 mb-1">
@@ -155,7 +147,7 @@ export default function DashboardHero({
               <span className="truncate">{ind.label}</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold">{ind.value}</span>
+              <span className="text-2xl font-bold">{ind.value}</span>
               <span className="text-xs text-white/80">{ind.unit}</span>
             </div>
           </div>
@@ -163,7 +155,7 @@ export default function DashboardHero({
       </div>
 
       {data && !error && (
-        <p className="text-xs text-white/75 mb-5" aria-live="polite">
+        <p className="mt-3 text-xs text-white/75" aria-live="polite">
           {data.source === 'openweathermap'
             ? data.location_source === 'device'
               ? 'Data cuaca real — lokasi Anda'
@@ -174,11 +166,11 @@ export default function DashboardHero({
         </p>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="mt-5 flex flex-col sm:flex-row gap-3">
         {showScanCta && (
           <Link
             href="/scan"
-            className="inline-flex items-center justify-center gap-2 min-h-[56px] px-5 py-3 bg-white text-[#2E7D32] font-bold rounded-xl hover:bg-green-50 active:scale-[0.99] transition-all text-sm sm:text-base text-center"
+            className="inline-flex items-center justify-center gap-2 min-h-[56px] px-5 py-3 bg-white text-[#2E7D32] font-bold rounded-xl hover:bg-green-50 active:scale-[0.99] transition-all text-sm sm:text-base text-center shadow-sm"
           >
             <Camera size={22} aria-hidden="true" />
             SCAN KERUSAKAN SAWAH (AI)
