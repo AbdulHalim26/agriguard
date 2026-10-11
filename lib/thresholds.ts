@@ -16,6 +16,7 @@ export const WATER_LEVEL_THRESHOLD_BAHAYA_M = 1.2
 // Catatan: ini HANYA token presentasi. Logika ambang tetap di calculateFloodStatus.
 export interface FloodStatusStyle {
   gradient: string
+  bannerClass: string
   iconBg: string
   chipBg: string
   chipText: string
@@ -25,6 +26,7 @@ export interface FloodStatusStyle {
 export const STATUS_CONFIG: Record<FloodStatus, FloodStatusStyle> = {
   aman: {
     gradient: 'from-[#2E7D32] to-[#43A047]',
+    bannerClass: 'banner-aman',
     iconBg: 'bg-white/20',
     chipBg: 'bg-green-100',
     chipText: 'text-green-700',
@@ -32,6 +34,7 @@ export const STATUS_CONFIG: Record<FloodStatus, FloodStatusStyle> = {
   },
   waspada: {
     gradient: 'from-[#ED6C02] to-[#F59E0B]',
+    bannerClass: 'banner-waspada',
     iconBg: 'bg-white/20',
     chipBg: 'bg-amber-100',
     chipText: 'text-[#ED6C02]',
@@ -39,6 +42,7 @@ export const STATUS_CONFIG: Record<FloodStatus, FloodStatusStyle> = {
   },
   bahaya: {
     gradient: 'from-[#D32F2F] to-[#E53935]',
+    bannerClass: 'banner-bahaya',
     iconBg: 'bg-white/20',
     chipBg: 'bg-red-100',
     chipText: 'text-[#D32F2F]',
@@ -48,6 +52,7 @@ export const STATUS_CONFIG: Record<FloodStatus, FloodStatusStyle> = {
 
 export const STATUS_STYLE_FALLBACK: FloodStatusStyle = {
   gradient: 'from-gray-500 to-gray-600',
+  bannerClass: 'bg-gradient-to-br from-gray-500 to-gray-600',
   iconBg: 'bg-white/20',
   chipBg: 'bg-gray-100',
   chipText: 'text-gray-600',
