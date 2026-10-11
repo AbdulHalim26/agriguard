@@ -47,7 +47,10 @@ Thumbs.db
 supabase/.temp/
 
 # AI service
-ai-service/model/
+ai-service/model/*
+!ai-service/model/model.onnx
+!ai-service/model/config.json
+!ai-service/model/preprocessor_config.json
 ai-service/__pycache__/
 ai-service/*.pyc
 ai-service/.venv/
