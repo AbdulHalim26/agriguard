@@ -3,9 +3,16 @@ import { getAllPendingReports, deleteReport, incrementRetryCount } from './db'
 export interface SyncResult {
   success: boolean
   syncedCount: number
+  skippedCount: number
   failedCount: number
   errors: string[]
 }
+
+// Status HTTP yang TIDAK akan pernah berhasil bila diulang (kesalahan data,
+// duplikat, atau akses) — item seperti ini dikeluarkan dari antrian agar tidak
+// menggantung selamanya ("Menunggu Sync (1)"). Yang tersisa hanya error
+// transien (jaringan / 5xx) yang memang layak dicoba lagi.
+const PERMANENT_STATUS = new Set([400, 403, 409, 422])
 
 // Catatan desain: satu laporan = satu request multipart ke /api/sync.
 // /api/sync idempotent via idempotency_key (upsert), jadi membatalkan duplikat.
@@ -13,6 +20,7 @@ export async function syncReports(): Promise<SyncResult> {
   const result: SyncResult = {
     success: true,
     syncedCount: 0,
+    skippedCount: 0,
     failedCount: 0,
     errors: [],
   }
@@ -55,10 +63,21 @@ export async function syncReports(): Promise<SyncResult> {
         await deleteReport(report.id)
         result.syncedCount++
       } else {
-        await incrementRetryCount(report.id)
-        result.failedCount++
         const errorData = await response.json().catch(() => ({}))
-        result.errors.push(`Laporan ${report.id}: ${errorData.error || 'Gagal sync'}`)
+        const message: string = errorData.error || 'Gagal sync'
+
+        if (PERMANENT_STATUS.has(response.status)) {
+          // Duplikat/validasi/akses: tidak bisa "diperbaiki" dengan retry ->
+          // keluarkan dari antrian agar UI tidak menggantung, tapi laporkan.
+          await deleteReport(report.id)
+          result.skippedCount++
+          result.errors.push(`Laporan ${report.id} dilewati: ${message}`)
+        } else {
+          // Error transien (5xx dsb.) -> pertahankan & coba lagi nanti.
+          await incrementRetryCount(report.id)
+          result.failedCount++
+          result.errors.push(`Laporan ${report.id}: ${message}`)
+        }
       }
     } catch (error) {
       await incrementRetryCount(report.id)

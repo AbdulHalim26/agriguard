@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
   FileText,
@@ -95,25 +95,6 @@ export default function LaporanClient() {
 
   const userId = useCurrentUserId()
 
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    const refresh = async () => {
-      try {
-        const c = await getReportCount(userId)
-        if (!cancelled) setPendingCount(c)
-      } catch {
-        if (!cancelled) setPendingCount(0)
-      }
-    }
-    refresh()
-    const unsub = subscribeQueue(refresh)
-    return () => {
-      cancelled = true
-      unsub()
-    }
-  }, [userId])
-
   const fetchReports = useCallback(async (asRefresh = false) => {
     if (asRefresh) setRefreshing(true)
     else setLoading(true)
@@ -130,6 +111,33 @@ export default function LaporanClient() {
       else setLoading(false)
     }
   }, [])
+
+  // Pantau antrian offline: saat jumlahnya TURUN (laporan baru saja tersinkron),
+  // muat ulang daftar agar laporan yang baru masuk langsung muncul tanpa reload.
+  const prevPendingRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    const refresh = async () => {
+      try {
+        const c = await getReportCount(userId)
+        if (cancelled) return
+        setPendingCount(c)
+        if (prevPendingRef.current !== null && c < prevPendingRef.current) {
+          fetchReports(true)
+        }
+        prevPendingRef.current = c
+      } catch {
+        if (!cancelled) setPendingCount(0)
+      }
+    }
+    refresh()
+    const unsub = subscribeQueue(refresh)
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [userId, fetchReports])
 
   useEffect(() => {
     fetchReports()

@@ -201,6 +201,7 @@ export default function SettingsPage() {
     } else {
       const result = await syncReports()
       if (result.syncedCount > 0) setSyncMsg(`Berhasil menyinkronkan ${result.syncedCount} laporan.`)
+      else if (result.skippedCount > 0) setSyncMsg(result.errors[0] || 'Sebagian laporan dilewati.')
       else if (result.failedCount > 0) setSyncMsg(result.errors[0] || 'Beberapa laporan gagal disinkronkan.')
       else setSyncMsg('Tidak ada laporan yang perlu disinkronkan.')
     }

@@ -30,6 +30,8 @@ export default function SyncWidget({ userId }: { userId: string }) {
       const result = await syncReports()
       if (result.syncedCount > 0) {
         setMessage(`Berhasil menyinkronkan ${result.syncedCount} laporan.`)
+      } else if (result.skippedCount > 0) {
+        setMessage(result.errors[0] || 'Sebagian laporan dilewati.')
       } else if (result.failedCount > 0) {
         setMessage(result.errors[0] || 'Beberapa laporan gagal disinkronkan.')
       }
@@ -57,7 +59,12 @@ export default function SyncWidget({ userId }: { userId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
-  if (count === null || count === 0) return null
+  // Sembunyikan hanya bila tidak ada antrian DAN tidak ada pesan. Pesan tetap
+  // ditampilkan sesaat (mis. laporan duplikat yang dilewati) walau antrian kosong.
+  if (count === null) return null
+  if (count === 0 && !message) return null
+
+  const hasQueue = count > 0
 
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
@@ -66,30 +73,46 @@ export default function SyncWidget({ userId }: { userId: string }) {
           <UploadCloud size={20} className="text-amber-600" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-amber-900">Menunggu Sync ({count})</h3>
-          <p className="text-sm text-amber-800 mt-0.5">
-            {isOnline()
-              ? 'Laporan tersimpan offline akan dikirim ke server secara otomatis.'
-              : 'Anda sedang offline. Laporan aman tersimpan di perangkat ini.'}
-          </p>
+          <h3 className="font-semibold text-amber-900">
+            {hasQueue ? `Menunggu Sync (${count})` : 'Sinkronisasi'}
+          </h3>
+          {hasQueue && (
+            <p className="text-sm text-amber-800 mt-0.5">
+              {isOnline()
+                ? 'Laporan tersimpan offline akan dikirim ke server secara otomatis.'
+                : 'Anda sedang offline. Laporan aman tersimpan di perangkat ini.'}
+            </p>
+          )}
           {message && <p className="text-xs text-amber-700 mt-1">{message}</p>}
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
-          >
-            {syncing ? (
-              <>
-                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                Menyinkronkan...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={16} aria-hidden="true" />
-                Sinkronkan Sekarang
-              </>
+          <div className="mt-3 flex items-center gap-2">
+            {hasQueue && (
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    Menyinkronkan...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} aria-hidden="true" />
+                    Sinkronkan Sekarang
+                  </>
+                )}
+              </button>
             )}
-          </button>
+            {message && (
+              <button
+                onClick={() => setMessage(null)}
+                className="text-xs text-amber-700 underline hover:text-amber-900"
+              >
+                Tutup
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
