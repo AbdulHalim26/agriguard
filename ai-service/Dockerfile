@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py predict.py ./
+COPY model/ ./model/
 
 EXPOSE 8000
 

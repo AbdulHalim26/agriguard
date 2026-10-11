@@ -2,4 +2,5 @@ fastapi>=0.111,<1
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
 pillow>=10.3
-# ultralytics>=8.2   # aktifkan saat weights YOLO tersedia (Milestone 4)
+numpy>=1.26
+onnxruntime>=1.18
