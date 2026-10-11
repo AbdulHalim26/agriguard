@@ -35,6 +35,8 @@ import {
 } from '@/lib/offline/status'
 import { useCurrentUserId } from '@/lib/offline/use-current-user'
 import type { GeoCoords } from './ScanMap'
+import PhotoGuide from './PhotoGuide'
+import ScanTerbaru from './ScanTerbaru'
 
 const ScanMap = dynamic(() => import('./ScanMap'), {
   ssr: false,
@@ -336,7 +338,8 @@ export default function ScanPage() {
   }, [successId, router])
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="max-w-5xl mx-auto grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+      <div className="space-y-6 min-w-0">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Scan Kerusakan Padi</h1>
         <p className="text-gray-500 mt-1">Foto padi, hasil AI, lalu laporkan dengan lokasi.</p>
@@ -394,6 +397,18 @@ export default function ScanPage() {
               alt="Pratinjau foto padi"
               className="w-full h-72 object-cover"
             />
+            {/* Bracket sudut viewport kamera */}
+            <span className="pointer-events-none absolute inset-3" aria-hidden="true">
+              <span className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-white/90 rounded-tl-md" />
+              <span className="absolute right-0 top-0 h-6 w-6 border-r-4 border-t-4 border-white/90 rounded-tr-md" />
+              <span className="absolute left-0 bottom-0 h-6 w-6 border-l-4 border-b-4 border-white/90 rounded-bl-md" />
+              <span className="absolute right-0 bottom-0 h-6 w-6 border-r-4 border-b-4 border-white/90 rounded-br-md" />
+            </span>
+            {/* Chip lokasi GPS */}
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/55 text-white text-xs backdrop-blur">
+              <MapPin size={12} aria-hidden="true" />
+              {coords ? 'Lokasi Terdeteksi' : 'Lokasi belum terdeteksi'}
+            </span>
             <button
               onClick={() => {
                 setPhoto(null)
@@ -642,6 +657,13 @@ export default function ScanPage() {
           e.target.value = ''
         }}
       />
+
+      {/* Tabel Scan Terbaru (section F [BARU]) */}
+      <ScanTerbaru />
+      </div>
+
+      {/* Panel Panduan Foto (desktop: kanan, mobile: card bawah) */}
+      <PhotoGuide />
     </div>
   )
 }
