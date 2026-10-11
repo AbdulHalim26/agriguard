@@ -8,7 +8,7 @@ Platform peringatan dini banjir sawah hiper-lokal dengan AI untuk petani dan PPL
 - **UI**: Tailwind CSS + shadcn/ui
 - **Backend/DB/Auth/Storage**: Supabase (Postgres + RLS + Auth + Storage)
 - **Maps**: Leaflet + OpenStreetMap
-- **AI**: FastAPI + YOLOv8n-cls (Hugging Face Spaces)
+- **AI**: FastAPI + EfficientNet-B0 (ONNX) (Hugging Face Spaces)
 - **Offline**: IndexedDB (idb) + Service Worker
 
 ## Getting Started
@@ -89,7 +89,13 @@ agriguard/
 ## AI Service (`/ai-service`)
 
 FastAPI untuk klasifikasi foto padi (3 kelas: `aman`, `rusak_ringan`, `rusak_berat`).
-Saat ini memakai placeholder deterministik — kontrak endpoint sudah benar.
+Memakai model **real** hasil transfer learning: EfficientNet-B0
+(`SodaXII/efficientnet-b0_rice-leaf-disease-augmented-v4_fft`, 8 kelas) yang
+diekspor ke **ONNX** dan dijalankan via `onnxruntime` (runtime tanpa torch).
+Pemetaan 8 label → 3 status (`LABEL_TO_STATUS`) dan detail ada di
+[`ai-service/README.md`](ai-service/README.md).
+
+Endpoint: `GET /health`, `POST /predict` (kontrak tetap), `GET /model-info`.
 
 ### Run Lokal
 
@@ -105,16 +111,17 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ```bash
 curl http://localhost:8000/health
-# {"status":"ok"}
+# {"status":"ok","model_loaded":true}
 
 curl -X POST http://localhost:8000/predict \
-  -F "image=@/path/foto.jpg"
-# {"status":"rusak_ringan","confidence":0.78,"damage_pct":30}
+  -F "image=@tests/samples/sample_rusak_ringan.jpg"
+# {"status":"rusak_ringan","confidence":0.9988,"damage_pct":60}
 ```
 
 Setelah berjalan, isi `AI_API_URL=http://localhost:8000` di `.env` (server-only).
-Deploy ke Hugging Face Spaces: buat Space Docker, upload isi `ai-service/` (termasuk
-`Dockerfile`), lalu set `AI_API_URL` ke URL Space.
+Deploy ke Hugging Face Spaces: buat Space **Docker**, upload isi `ai-service/`
+(termasuk `Dockerfile` + `model/model.onnx`), lalu set `AI_API_URL` ke URL Space.
+Catatan cold start free tier & strategi keep-alive ada di `ai-service/README.md`.
 
 ## Fitur Scan & Laporan (M2b)
 
