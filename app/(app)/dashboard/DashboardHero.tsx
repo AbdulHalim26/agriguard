@@ -139,7 +139,7 @@ export default function DashboardHero({
           <div
             key={ind.label}
             className={`rounded-xl px-4 py-3 ${
-              ind.warn ? 'bg-white/25 ring-1 ring-white/60' : 'bg-white/10'
+              ind.warn ? 'bg-white/25 ring-1 ring-white/60' : 'bg-white/15'
             }`}
           >
             <div className="flex items-center gap-1.5 text-[11px] text-white/80 mb-1">
