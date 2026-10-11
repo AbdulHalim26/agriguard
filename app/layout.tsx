@@ -14,8 +14,9 @@ export const metadata: Metadata = {
     'Platform peringatan dini banjir sawah hiper-lokal dengan AI untuk petani dan PPL/Dinas',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icon-192.png',
-    apple: '/icon-192.png',
+    icon: '/icons/icon-192.png',
+    shortcut: '/icons/icon-192.png',
+    apple: '/icons/icon-192.png',
   },
 }
 

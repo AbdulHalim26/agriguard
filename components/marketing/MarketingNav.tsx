@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import BrandLogo from '@/components/brand/BrandLogo'
 
 const LINKS = [
   { href: '/', label: 'Beranda' },
@@ -17,9 +17,9 @@ export default function MarketingNav() {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <Image src="/logo.png" alt="AgriGuard" width={32} height={32} className="rounded-md" />
-          <span className="hidden sm:inline font-bold text-lg text-[#2E7D32]">AgriGuard</span>
+        <Link href="/" className="flex items-center shrink-0" aria-label="AgriGuard — Beranda">
+          <BrandLogo variant="color" size="md" className="sm:hidden" showText={false} />
+          <BrandLogo variant="color" size="md" className="hidden sm:inline-flex" />
         </Link>
 
         <nav className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto">

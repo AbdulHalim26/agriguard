@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import BrandLogo from '@/components/brand/BrandLogo'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import AutoSync from '@/components/AutoSync'
@@ -152,14 +152,7 @@ export default function AppLayout({
           {/* Brand */}
           <div className="px-5 pt-6 pb-4 flex items-start justify-between">
             <div>
-              <Image
-                src="/logo-white.png"
-                alt="AgriGuard"
-                width={150}
-                height={40}
-                className="h-9 w-auto"
-                priority
-              />
+              <BrandLogo variant="white" size="md" />
               <p className="mt-2 text-[11px] leading-snug text-white/75 max-w-[190px]">
                 Teknologi Cerdas untuk Sawah yang Lebih Terjaga
               </p>

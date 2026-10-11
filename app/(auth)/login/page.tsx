@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, Suspense } from 'react'
-import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
+import BrandLogo from '@/components/brand/BrandLogo'
 import { createClient } from '@/lib/supabase/client'
 import { getOtpService, isMockMode } from '@/lib/auth/otp'
 import { normalizePhone } from '@/lib/utils'
@@ -151,10 +151,7 @@ function LoginForm() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-[#1B5E20] to-[#2E7D32] text-white p-10 xl:p-14">
-        <div className="flex items-center gap-2">
-          <Image src="/logo-white.png" alt="AgriGuard" width={36} height={36} />
-          <span className="font-bold text-xl">AgriGuard</span>
-        </div>
+        <BrandLogo variant="white" size="lg" />
 
         <div>
           <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-3">
@@ -186,9 +183,8 @@ function LoginForm() {
       <div className="flex items-center justify-center bg-gray-50 px-4 py-12">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           <div className="text-center mb-8">
-            <div className="lg:hidden flex items-center justify-center gap-2 mb-3">
-              <Image src="/logo.png" alt="AgriGuard" width={36} height={36} className="rounded-md" />
-              <span className="text-2xl font-bold text-[#2E7D32]">AgriGuard</span>
+            <div className="lg:hidden flex justify-center mb-3">
+              <BrandLogo variant="color" size="md" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 hidden lg:block">Masuk atau Daftar</h1>
             <p className="text-gray-500 mt-1">Gunakan nomor WhatsApp Anda</p>

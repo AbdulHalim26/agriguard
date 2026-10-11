@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import MarketingNav from '@/components/marketing/MarketingNav'
+import BrandLogo from '@/components/brand/BrandLogo'
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,10 +10,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <footer className="bg-[#1B5E20] text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-2">
           <div>
-            <div className="flex items-center gap-2 font-bold text-lg mb-3">
-              <Image src="/logo-white.png" alt="AgriGuard" width={32} height={32} />
-              AgriGuard
-            </div>
+            <BrandLogo variant="white" size="md" className="mb-3" />
             <p className="text-sm text-green-100 max-w-sm">
               Teknologi Cerdas untuk Sawah yang Lebih Terjaga.
             </p>
