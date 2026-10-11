@@ -110,6 +110,26 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
+  // Public / protected route sets (dipakai di beberapa cabang logika di bawah).
+  const publicRoutes = ['/login', '/onboarding']
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
+
+  const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi', '/notifikasi', '/settings']
+  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+  // Kunci pembeda online/offline: apakah browser MEMBAWA session cookie Supabase.
+  // - Tanpa cookie sama sekali & refresh gagal  -> anonim, redirect ke /login.
+  // - Ada cookie tapi refresh gagal (offline)   -> izinkan (offline-first).
+  const hasSessionCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'))
+
+  const redirectToLogin = () => {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
   try {
     // Use mock client only when env vars are truly empty
     const supabase = isConfigured
@@ -132,15 +152,15 @@ export async function middleware(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser()
 
-    // Supabase tidak terjangkau (offline/network error): jangan blokir semua
-    // request. Halaman & error boundary akan menangani mode offline-nya.
+    // Refresh session gagal. Bedakan berdasarkan ADA/TIDAKNYA cookie:
+    // - Ada cookie (kemungkinan offline) -> jangan blokir (offline-first).
+    // - Tidak ada cookie & rute terproteksi -> anonim, arahkan ke /login.
     if (authError && !user) {
+      if (!hasSessionCookie && isProtectedRoute) {
+        return redirectToLogin()
+      }
       return NextResponse.next()
     }
-
-    // Public routes
-    const publicRoutes = ['/login', '/onboarding']
-    const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
     // Auth routes - redirect if already logged in
     if (isPublicRoute && user) {
@@ -159,13 +179,8 @@ export async function middleware(request: NextRequest) {
     }
 
     // Protected routes - redirect to login if not authenticated
-    const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi', '/notifikasi', '/settings']
-    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-
     if (isProtectedRoute && !user) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(loginUrl)
+      return redirectToLogin()
     }
 
     // Check onboarding completion for app routes (except onboarding itself)
@@ -188,6 +203,11 @@ export async function middleware(request: NextRequest) {
     }
   } catch (error) {
     console.warn('[supabase] middleware: gagal verifikasi (offline?), lanjut tanpa blokir.', error)
+    // Tanpa cookie + rute terproteksi -> tetap anggap anonim (redirect), bukan
+    // membuka shell. Dengan cookie -> biarkan offline-first berjalan.
+    if (!hasSessionCookie && isProtectedRoute) {
+      return redirectToLogin()
+    }
     return NextResponse.next()
   }
 
