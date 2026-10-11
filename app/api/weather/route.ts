@@ -63,7 +63,8 @@ export async function GET(request: Request) {
     })
   }
 
-  // Tanpa API key — kembalikan mock dengan indikasi jelas
+  // Tanpa API key — kembalikan mock dengan indikasi jelas.
+  // Tidak di-cache agar begitu key ditambahkan, data real langsung tampil.
   if (!apiKey) {
     const mockData: WeatherData = {
       ...MOCK_WEATHER,
@@ -71,14 +72,15 @@ export async function GET(request: Request) {
       location_source: locationSource,
       cached: false,
     }
-    weatherCache.set(cacheKey, { data: mockData, timestamp: Date.now() })
     return NextResponse.json(mockData)
   }
 
   try {
+    // no-store: cache diatur oleh weatherCache (Map) di atas agar kegagalan
+    // tidak ikut ter-cache dan data real bisa langsung tampil saat key valid.
     const response = await fetch(
       `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=id`,
-      { next: { revalidate: 600 } }
+      { cache: 'no-store' }
     )
 
     if (!response.ok) {
@@ -87,14 +89,22 @@ export async function GET(request: Request) {
 
     const data = await response.json()
 
+    // Curah hujan 3 jam ke depan dari prakiraan (item `/forecast` berjarak 3
+    // jam dan ber-timestamp ke depan, bukan ke belakang).
     const now = Date.now()
-    const threeHoursAgo = now - 3 * 60 * 60 * 1000
+    const horizon = now + 3 * 60 * 60 * 1000
 
     let rain3h = 0
-    for (const item of data.list) {
-      const itemTime = item.dt * 1000
-      if (itemTime >= threeHoursAgo && itemTime <= now) {
-        rain3h += item.rain?.['3h'] || 0
+    if (Array.isArray(data.list)) {
+      for (const item of data.list) {
+        const itemTime = item.dt * 1000
+        if (itemTime >= now - 30 * 60 * 1000 && itemTime <= horizon) {
+          rain3h += item.rain?.['3h'] || 0
+        }
+      }
+      // Fallback: pakai slot prakiraan pertama bila jendela kosong.
+      if (rain3h === 0 && data.list[0]) {
+        rain3h = data.list[0].rain?.['3h'] || 0
       }
     }
 
@@ -117,7 +127,9 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Weather API error:', error)
 
-    // Fallback mock — demo tidak boleh mati
+    // Fallback mock — demo tidak boleh mati. TIDAK di-cache: agar tidak
+    // menyembunyikan data real setelah API key diperbaiki, request berikutnya
+    // akan mencoba OpenWeather lagi.
     const fallbackData: WeatherData = {
       ...MOCK_WEATHER,
       source: 'mock_fallback',
@@ -125,7 +137,6 @@ export async function GET(request: Request) {
       location_source: locationSource,
       cached: false,
     }
-    weatherCache.set(cacheKey, { data: fallbackData, timestamp: Date.now() })
     return NextResponse.json(fallbackData)
   }
 }

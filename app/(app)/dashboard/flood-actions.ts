@@ -55,9 +55,10 @@ export async function getFloodStatus(
       weatherUrl.searchParams.set('lat', String(coords.lat))
       weatherUrl.searchParams.set('lon', String(coords.lon))
     }
-    const weatherRes = await fetch(weatherUrl.toString(), {
-      next: { revalidate: 600 },
-    })
+    // no-store: /api/weather sudah punya cache internal (10 menit, hanya untuk
+    // respons sukses). Jangan cache di sini agar kegagalan/key-error tidak
+    // tertahan dan cuaca per-lokasi selalu sesuai koordinat terbaru.
+    const weatherRes = await fetch(weatherUrl.toString(), { cache: 'no-store' })
     if (weatherRes.ok) {
       const weatherData = await weatherRes.json()
       rain3h = weatherData.rain_3h_mm ?? null

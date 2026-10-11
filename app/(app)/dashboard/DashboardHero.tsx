@@ -12,7 +12,7 @@ import {
   Droplets,
 } from 'lucide-react'
 import { getFloodStatus, type FloodStatusData } from '@/app/(app)/dashboard/flood-actions'
-import { hasGrantedLocation, requestLocation } from '@/lib/location'
+import { requestLocation } from '@/lib/location'
 import {
   RAIN_THRESHOLD_WASPADA_MM,
   WATER_LEVEL_THRESHOLD_BAHAYA_M,
@@ -45,15 +45,14 @@ export default function DashboardHero({
     setLoading(true)
     setError(false)
     try {
-      // Kirim koordinat perangkat bila izin sudah diberikan (tanpa prompt),
-      // fallback ke koordinat pusat Karawang di server.
+      // Pakai koordinat perangkat (realtime sesuai lokasi). Bila izin belum
+      // diberikan, browser memunculkan prompt sekali; bila ditolak/tidak
+      // tersedia, server memakai fallback koordinat pusat Karawang.
       let coords: { lat: number; lon: number } | undefined
       try {
-        if (await hasGrantedLocation()) {
-          const loc = await requestLocation()
-          if (loc.status === 'granted' && loc.lat != null && loc.lng != null) {
-            coords = { lat: loc.lat, lon: loc.lng }
-          }
+        const loc = await requestLocation()
+        if (loc.status === 'granted' && loc.lat != null && loc.lng != null) {
+          coords = { lat: loc.lat, lon: loc.lng }
         }
       } catch {
         coords = undefined
@@ -169,7 +168,9 @@ export default function DashboardHero({
             ? data.location_source === 'device'
               ? 'Data cuaca real — lokasi Anda'
               : 'Data cuaca real — lokasi default (Karawang)'
-            : 'Data simulasi'}
+            : data.source === 'mock_fallback'
+              ? 'Data simulasi — layanan cuaca tidak dapat diakses (periksa API key)'
+              : 'Data simulasi — API key cuaca belum diatur'}
         </p>
       )}
 
