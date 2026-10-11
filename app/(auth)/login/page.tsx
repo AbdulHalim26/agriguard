@@ -1,10 +1,35 @@
 'use client'
 
 import { useState, Suspense } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getOtpService, isMockMode } from '@/lib/auth/otp'
 import { normalizePhone } from '@/lib/utils'
+import { Waves, Camera, WifiOff, ShieldCheck } from 'lucide-react'
+
+const BENEFITS = [
+  {
+    icon: Waves,
+    title: 'Peringatan dini banjir',
+    desc: 'Status hiper-lokal dari curah hujan & tinggi air.',
+  },
+  {
+    icon: Camera,
+    title: 'Deteksi kerusakan AI',
+    desc: 'Cukup foto sawah, AI menilai tingkat kerusakan.',
+  },
+  {
+    icon: WifiOff,
+    title: 'Andal tanpa sinyal',
+    desc: 'Laporan tersimpan offline dan tersinkron otomatis.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Verifikasi PPL & Dinas',
+    desc: 'Laporan ditinjau petugas sebelum ditindaklanjuti.',
+  },
+]
 
 function LoginForm() {
   const router = useRouter()
@@ -124,14 +149,52 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">AgriGuard</h1>
-          <p className="text-gray-500 mt-1">Masuk untuk melanjutkan</p>
+    <div className="min-h-screen grid lg:grid-cols-2">
+      <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-[#1B5E20] to-[#2E7D32] text-white p-10 xl:p-14">
+        <div className="flex items-center gap-2">
+          <Image src="/logo-white.png" alt="AgriGuard" width={36} height={36} />
+          <span className="font-bold text-xl">AgriGuard</span>
         </div>
 
-        {error && (
+        <div>
+          <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-3">
+            Lindungi sawah Anda, sebelum air datang.
+          </h2>
+          <p className="text-green-50/90 mb-8 max-w-md">
+            Teknologi Cerdas untuk Sawah yang Lebih Terjaga.
+          </p>
+          <ul className="space-y-5 max-w-md">
+            {BENEFITS.map((b) => (
+              <li key={b.title} className="flex gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                  <b.icon size={20} className="text-green-100" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="font-semibold">{b.title}</p>
+                  <p className="text-sm text-green-50/80">{b.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="text-xs text-green-50/60">
+          AgriGuard — peringatan dini banjir sawah hiper-lokal.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-center bg-gray-50 px-4 py-12">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+          <div className="text-center mb-8">
+            <div className="lg:hidden flex items-center justify-center gap-2 mb-3">
+              <Image src="/logo.png" alt="AgriGuard" width={36} height={36} className="rounded-md" />
+              <span className="text-2xl font-bold text-[#2E7D32]">AgriGuard</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 hidden lg:block">Masuk atau Daftar</h1>
+            <p className="text-gray-500 mt-1">Gunakan nomor WhatsApp Anda</p>
+          </div>
+
+          {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" role="alert">
             {error}
           </div>
@@ -218,6 +281,7 @@ function LoginForm() {
         <p className="mt-6 text-center text-sm text-gray-500">
           Dengan masuk, Anda menyetujui Syarat & Ketentuan dan Kebijakan Privasi AgriGuard.
         </p>
+        </div>
       </div>
     </div>
   )
