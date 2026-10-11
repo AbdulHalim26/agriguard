@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Polygon, Marker, Tooltip, LayersControl, useMap } from 'react-leaflet'
 import * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -15,8 +15,20 @@ const PIN_COLORS: Record<string, string> = {
   manual: '#6b7280',
 }
 
+// Polygon lahan: null = belum ada laporan -> hijau brand tipis
+const POLYGON_COLORS: Record<string, string> = {
+  aman: '#16a34a',
+  rusak_ringan: '#ED6C02',
+  rusak_berat: '#D32F2F',
+  none: '#2E7D32',
+}
+
 function pinColorFor(status: AiStatus | null): string {
   return status ? PIN_COLORS[status] : PIN_COLORS.manual
+}
+
+function polygonColorFor(status: AiStatus | null): string {
+  return status ? POLYGON_COLORS[status] : POLYGON_COLORS.none
 }
 
 function renderPinColor(status: AiStatus | null) {
@@ -24,7 +36,7 @@ function renderPinColor(status: AiStatus | null) {
   return `<div style="width:26px;height:34px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))"><svg viewBox="0 0 24 24" width="26" height="34"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="9" r="3" fill="#fff"/></svg></div>`
 }
 
-function getPinIcon(latlng: { lat: number; lng: number }, status: AiStatus | null) {
+function getPinIcon(status: AiStatus | null) {
   return Leaflet.divIcon({
     className: '',
     html: renderPinColor(status),
@@ -72,13 +84,24 @@ export default function PetaMap({
   lahan,
   reports,
   onSelectReport,
+  onSelectLahan,
 }: {
   lahan: PetaLahan[]
   reports: PetaReport[]
   onSelectReport: (report: PetaReport) => void
+  onSelectLahan: (lahan: PetaLahan, status: AiStatus | null) => void
 }) {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [map, setMap] = useState<Leaflet.Map | null>(null)
+
+  // Status AI terbaru per lahan (reports sudah urut server_created_at desc)
+  const latestStatusByLahan = useMemo(() => {
+    const m = new Map<string, AiStatus | null>()
+    for (const r of reports) {
+      if (!m.has(r.lahan_id)) m.set(r.lahan_id, r.ai_status)
+    }
+    return m
+  }, [reports])
 
   const handleLocated = (lat: number, lng: number) => {
     setUserLocation([lat, lng])
@@ -94,37 +117,45 @@ export default function PetaMap({
         scrollWheelZoom
       >
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Peta">
+          {/* Default = Satelit (Esri World Imagery) sesuai frame */}
+          <LayersControl.BaseLayer checked name="Satelit">
+            <TileLayer
+              attribution="Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Peta (OSM)">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Satelit">
-            <TileLayer
-              attribution="Tiles &copy; Esri"
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
           </LayersControl.BaseLayer>
         </LayersControl>
         <MapInstanceCapture onReady={setMap} />
         <FitBounds lahan={lahan} />
 
-        {lahan.map((l) => (
-          <Polygon
-            key={l.id}
-            positions={l.polygon.map(([lng, lat]) => [lat, lng] as [number, number])}
-            pathOptions={{ color: '#16a34a', weight: 2, fillColor: '#16a34a', fillOpacity: 0.08 }}
-          >
-            <Tooltip>{l.name}</Tooltip>
-          </Polygon>
-        ))}
+        {lahan.map((l) => {
+          const status = latestStatusByLahan.get(l.id) ?? null
+          const color = polygonColorFor(status)
+          return (
+            <Polygon
+              key={l.id}
+              positions={l.polygon.map(([lng, lat]) => [lat, lng] as [number, number])}
+              pathOptions={{ color, weight: 2.5, fillColor: color, fillOpacity: 0.18 }}
+              eventHandlers={{ click: () => onSelectLahan(l, status) }}
+            >
+              <Tooltip>
+                {l.name} · {status ? AI_STATUS_INFO[status].label : 'Belum ada laporan'}
+              </Tooltip>
+            </Polygon>
+          )
+        })}
 
         {reports.map((r) => (
           <Marker
             key={r.id}
             position={[r.latitude, r.longitude]}
-            icon={getPinIcon({ lat: r.latitude, lng: r.longitude }, r.ai_status)}
+            icon={getPinIcon(r.ai_status)}
             eventHandlers={{ click: () => onSelectReport(r) }}
           >
             <Tooltip>
