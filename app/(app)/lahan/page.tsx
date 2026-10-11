@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import LahanList from './LahanList'
-import LahanForm from './LahanForm'
+import LahanForm from './LahanFormClient'
 import OfflineFallback from '@/components/features/OfflineFallback'
 
 export default async function LahanPage() {
