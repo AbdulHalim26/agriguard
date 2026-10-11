@@ -15,6 +15,7 @@ import {
   ArrowRight,
   FileWarning,
   WifiOff,
+  Clock,
 } from 'lucide-react'
 import { compressImage, validateGeofence, type Polygon } from '@/lib/geo'
 import {
@@ -77,6 +78,7 @@ export default function ScanPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [aiResult, setAiResult] = useState<AiResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [aiPending, setAiPending] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [manualStatus, setManualStatus] = useState<AiStatus>('rusak_ringan')
 
@@ -151,6 +153,7 @@ export default function ScanPage() {
     setSubmitError(null)
     setAiError(null)
     setAiResult(null)
+    setAiPending(false)
     setManualMode(false)
     setSuccessId(null)
     setSavedOffline(false)
@@ -171,6 +174,14 @@ export default function ScanPage() {
         previewUrl: URL.createObjectURL(blob),
         name: blob.type === 'image/png' ? 'scan.png' : 'scan.jpg',
       })
+
+      // Offline: AI belum bisa dijalankan. Laporan tetap bisa dikirim (masuk
+      // antrian) dengan ai_status NULL; server menjalankan analisis saat sync
+      // (lihat /api/sync). UI menandai "Menunggu Analisis AI".
+      if (isOfflineNow()) {
+        setAiPending(true)
+        return
+      }
 
       setAnalyzing(true)
       const form = new FormData()
@@ -414,6 +425,7 @@ export default function ScanPage() {
                 setPhoto(null)
                 setAiResult(null)
                 setAiError(null)
+                setAiPending(false)
                 setManualMode(false)
               }}
               className="absolute top-3 right-3 px-3 py-1.5 bg-black/60 text-white text-sm rounded-lg hover:bg-black/80 transition-colors"
@@ -447,6 +459,21 @@ export default function ScanPage() {
                   </p>
                   <p className="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
                     {AI_STATUS_INFO[aiResult.status].recommendation}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!analyzing && aiPending && !aiResult && !manualMode && (
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-lg">
+                <Clock className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <div className="text-sm">
+                  <p className="font-medium">Menunggu Analisis AI</p>
+                  <p className="mt-0.5 text-gray-600">
+                    Anda sedang offline. Hasil AI akan otomatis terisi setelah laporan
+                    tersinkron saat koneksi kembali.
                   </p>
                 </div>
               </div>

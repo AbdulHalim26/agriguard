@@ -336,8 +336,9 @@ export default function LaporanClient() {
                               {r.ai_confidence != null && ` · ${formatConfidence(r.ai_confidence)}`}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                              Manual
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                              <Clock className="w-3 h-3" aria-hidden="true" />
+                              Menunggu Analisis AI
                             </span>
                           )}
                         </td>
@@ -431,7 +432,10 @@ export default function LaporanClient() {
                         {selected.ai_confidence != null && ` · ${formatConfidence(selected.ai_confidence)}`}
                       </span>
                     ) : (
-                      <span className="text-sm text-gray-600">Laporan manual</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                        <Clock className="w-3 h-3" aria-hidden="true" />
+                        Menunggu Analisis AI
+                      </span>
                     )}
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3">

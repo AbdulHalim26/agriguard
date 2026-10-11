@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateSha256 } from '@/lib/geo'
+import { analyzeImage } from '@/lib/ai'
 
 export async function POST(request: NextRequest) {
   try {
@@ -195,6 +196,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // FR-03 lanjutan: laporan yang diantre offline tersimpan dengan ai_status
+    // NULL. Begitu online & baris tersimpan, jalankan analisis AI di server
+    // (server-to-server ke AI_API_URL) lalu lengkapi baris. Dipilih di server
+    // (bukan dari klien) agar analisis tetap berjalan walau tab ditutup setelah
+    // sync, dan tidak bergantung pada jaringan klien. Laporan dengan status
+    // manual (ai_status terisi) tidak dianalisis ulang.
+    let finalAiStatus = aiStatus
+    let finalAiConfidence = aiConfidence
+    let finalAiDamagePct = aiDamagePct
+
+    if (aiStatus === null) {
+      try {
+        const result = await analyzeImage(photos[0])
+        const { error: aiUpdateError } = await admin
+          .from('damage_reports')
+          .update({
+            ai_status: result.status,
+            ai_confidence: result.confidence,
+            ai_damage_pct: result.damage_pct,
+          })
+          .eq('id', inserted.id)
+
+        if (!aiUpdateError) {
+          finalAiStatus = result.status
+          finalAiConfidence = result.confidence
+          finalAiDamagePct = result.damage_pct
+        } else {
+          console.warn('[sync] gagal menyimpan hasil AI:', aiUpdateError.message)
+        }
+      } catch (aiError) {
+        // Analisis gagal (mis. AI service offline): laporan tetap tersimpan
+        // dengan ai_status NULL dan akan tampil sebagai "Menunggu Analisis AI".
+        console.warn('[sync] analisis AI tertunda gagal:', aiError)
+      }
+    }
+
     // Audit log (entity_id = id laporan sebenarnya, bukan idempotency_key)
     await admin
       .from('audit_logs')
@@ -203,10 +240,16 @@ export async function POST(request: NextRequest) {
         action: 'submit_report',
         entity: 'damage_reports',
         entity_id: inserted.id,
-        meta: { lahan_id: lahanId, ai_status: aiStatus },
+        meta: { lahan_id: lahanId, ai_status: finalAiStatus },
       })
 
-    return NextResponse.json({ success: true, id: inserted.id })
+    return NextResponse.json({
+      success: true,
+      id: inserted.id,
+      ai_status: finalAiStatus,
+      ai_confidence: finalAiConfidence,
+      ai_damage_pct: finalAiDamagePct,
+    })
   } catch (error) {
     console.error('Sync error:', error)
     return NextResponse.json(
