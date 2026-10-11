@@ -7,6 +7,8 @@ export const metadata = {
   description: 'AgriGuard membantu petani, PPL, dan Dinas Pertanian melindungi sawah dari banjir dan kerusakan.',
 }
 
+const NAVY = 'text-[#0B2545]'
+
 const WHY = [
   {
     icon: Target,
@@ -30,82 +32,86 @@ const WHY = [
 
 export default function TentangPage() {
   return (
-    <>
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0">
-          <Image
-            src="/ilustrations/hero-tentang.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0f3d13]/95 via-[#1B5E20]/85 to-[#2E7D32]/40" />
-        </div>
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-24 text-white">
-          <div className="max-w-2xl">
-            <span className="inline-block px-3 py-1 rounded-full bg-white/15 text-green-50 text-xs font-semibold mb-4 backdrop-blur">
-              Tentang Kami
-            </span>
-            <h1 className="text-3xl sm:text-5xl font-bold leading-tight mb-4">
-              Menjaga sawah, menjaga pangan.
-            </h1>
-            <p className="text-green-50/90 text-base sm:text-lg">
-              AgriGuard hadir untuk memberi petani waktu lebih banyak sebelum air datang — dan
-              keputusan yang lebih tepat saat kerusakan terjadi.
-            </p>
+    <div className="bg-[#F8F9FA]">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-10 sm:pb-14">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_18px_50px_-24px_rgba(11,37,69,0.28)] p-6 sm:p-10 lg:p-12">
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-[#2E7D32] text-xs font-semibold mb-4">
+                Tentang Kami
+              </span>
+              <h1 className={`text-3xl sm:text-4xl font-bold leading-tight mb-4 ${NAVY}`}>
+                Menjaga sawah, menjaga masa depan pangan.
+              </h1>
+              <p className="text-base sm:text-lg text-[#2E7D32]">
+                AgriGuard hadir untuk memberi petani waktu lebih banyak sebelum air datang — dan
+                keputusan yang lebih tepat saat kerusakan terjadi.
+              </p>
+            </div>
+            <div className="relative h-64 sm:h-72 lg:h-80 organic-photo-fitur shadow-lg">
+              <Image
+                src="/ilustrations/hero-tentang.jpg"
+                alt="Petani di sawah"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
+              />
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-8">Mengapa AgriGuard</h2>
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-14 sm:pb-20">
+        <h2 className={`text-xl sm:text-2xl font-bold mb-8 ${NAVY}`}>Mengapa AgriGuard</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           {WHY.map((w) => (
-            <div key={w.title} className="bg-white rounded-2xl border border-gray-200 p-6">
-              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-4">
+            <div
+              key={w.title}
+              className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_12px_30px_-20px_rgba(11,37,69,0.35)]"
+            >
+              <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mb-4">
                 <w.icon size={24} className="text-[#2E7D32]" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{w.title}</h3>
+              <h3 className={`text-lg font-semibold mb-2 ${NAVY}`}>{w.title}</h3>
               <p className="text-sm text-gray-600 leading-relaxed">{w.description}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="bg-white border-y border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
-          <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-[#2E7D32] text-xs font-semibold mb-4">
-            Misi
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-14 sm:pb-20">
+        <div className="soft-green-panel rounded-3xl px-6 py-12 sm:px-10 sm:py-16 text-center">
+          <span className="inline-block px-3 py-1 rounded-full bg-white text-[#2E7D32] text-xs font-semibold mb-4">
+            Misi Kami
           </span>
-          <p className="text-xl sm:text-2xl font-semibold text-gray-900 leading-relaxed">
+          <p className={`text-xl sm:text-2xl font-semibold leading-relaxed max-w-3xl mx-auto ${NAVY}`}>
             Membuat peringatan dini dan penilaian kerusakan sawah yang akurat dapat diakses oleh
             setiap petani, bukan hanya yang berada di kota.
           </p>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-8">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-14 sm:pb-20">
+        <h2 className={`text-xl sm:text-2xl font-bold mb-8 ${NAVY}`}>
           Dibangun untuk Petani &amp; PPL/Dinas
         </h2>
         <div className="grid gap-6 sm:grid-cols-2">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_12px_30px_-20px_rgba(11,37,69,0.35)]">
+            <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mb-4">
               <Sprout size={24} className="text-[#2E7D32]" aria-hidden="true" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Petani</h3>
+            <h3 className={`text-lg font-semibold mb-2 ${NAVY}`}>Petani</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
               Dapatkan peringatan dini banjir untuk lahan Anda, laporkan kerusakan dengan foto, dan
               terima rekomendasi tindakan yang jelas.
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_12px_30px_-20px_rgba(11,37,69,0.35)]">
+            <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mb-4">
               <Users size={24} className="text-[#2E7D32]" aria-hidden="true" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">PPL &amp; Dinas</h3>
+            <h3 className={`text-lg font-semibold mb-2 ${NAVY}`}>PPL &amp; Dinas</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
               Verifikasi laporan, beri catatan, dan pantau rekap luas terdampak per wilayah untuk
               respons yang lebih cepat.
@@ -114,8 +120,8 @@ export default function TentangPage() {
         </div>
       </section>
 
-      <section className="bg-[#2E7D32] text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
+        <div className="brand-gradient rounded-3xl px-6 py-12 sm:px-10 sm:py-16 text-center text-white">
           <ShieldCheck size={36} className="text-green-200 mx-auto mb-4" aria-hidden="true" />
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">Mulai bersama AgriGuard</h2>
           <p className="text-green-50/90 mb-6">
@@ -130,6 +136,6 @@ export default function TentangPage() {
           </Link>
         </div>
       </section>
-    </>
+    </div>
   )
 }
