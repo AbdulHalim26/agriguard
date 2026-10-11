@@ -14,9 +14,23 @@ export interface SyncResult {
 // transien (jaringan / 5xx) yang memang layak dicoba lagi.
 const PERMANENT_STATUS = new Set([400, 403, 409, 422])
 
+// Kunci "single-flight": AutoSync dan SyncWidget sama-sama bereaksi pada event
+// 'online', jadi tanpa ini dua sync akan berjalan bersamaan dan mengirim laporan
+// yang sama dua kali (berpotensi tabrakan unique idempotency_key di server).
+// Pemanggilan yang tumpang tindih berbagi promise yang sama.
+let inFlightSync: Promise<SyncResult> | null = null
+
+export function syncReports(): Promise<SyncResult> {
+  if (inFlightSync) return inFlightSync
+  inFlightSync = runSync().finally(() => {
+    inFlightSync = null
+  })
+  return inFlightSync
+}
+
 // Catatan desain: satu laporan = satu request multipart ke /api/sync.
 // /api/sync idempotent via idempotency_key (upsert), jadi membatalkan duplikat.
-export async function syncReports(): Promise<SyncResult> {
+async function runSync(): Promise<SyncResult> {
   const result: SyncResult = {
     success: true,
     syncedCount: 0,
