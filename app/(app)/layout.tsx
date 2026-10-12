@@ -133,7 +133,7 @@ export default function AppLayout({
     <div className="min-h-screen bg-surface">
       {/* Mobile sidebar overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-black/50 lg:hidden print:hidden transition-opacity ${
+        className={`fixed inset-0 z-[1000] bg-black/50 lg:hidden print:hidden transition-opacity ${
           sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setSidebarOpen(false)}
@@ -143,7 +143,7 @@ export default function AppLayout({
       {/* Sidebar */}
       <aside
         id="sidebar"
-        className={`fixed inset-y-0 left-0 z-50 w-72 overflow-hidden bg-gradient-to-b from-[#2E7D32] via-[#2E7D32] to-[#1B5E20] shadow-xl transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
+        className={`fixed inset-y-0 left-0 z-[1010] w-72 overflow-hidden bg-gradient-to-b from-[#2E7D32] via-[#2E7D32] to-[#1B5E20] shadow-xl transform transition-transform duration-200 lg:translate-x-0 print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Navigasi utama"
