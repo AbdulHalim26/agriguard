@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: agriguard-ai
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: ./ai-service
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8000
