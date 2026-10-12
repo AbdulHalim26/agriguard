@@ -208,3 +208,30 @@ Kontrak `/predict` & akurasi sesuai desain; tidak ada aksi.
 5. Beri guard sesi eksplisit pada `GET /api/water-levels` (konsistensi 401).
 6. Pertimbangkan pemindahan rate limit AI ke penyimpanan bersama (Upstash/DB) untuk produksi.
 7. Lengkapi `.env.example` & dokumentasi penerapan migrasi pada README.
+
+---
+
+## BAGIAN 3 — Uji Lapangan Mobile (post-deployment)
+
+Tanggal: 12 Oktober 2026
+Lingkungan: **produksi** — web di Vercel (`agriguard-five.vercel.app`), AI di Render (`agriguard-ai-96hh.onrender.com`), diuji langsung dari **HP Android** (viewport 360–414 px).
+Tujuan: memvalidasi kesiapan pakai petani nyata. Ditemukan **7 catatan revisi** (1–7; #2 & #7 akar masalahnya sama) dan semuanya diperbaiki di tahap ini.
+
+| ID | Halaman/Area | Temuan (uji lapangan) | Perbaikan | Bukti (commit) |
+|---|---|---|---|---|
+| FM-01 | Footer landing | Container footer terasa menjorok & link (Fitur/Cara Kerja/Tentang/Masuk) tersusun **vertikal** sehingga memakan tinggi di mobile | Footer dirapikan: padding horizontal konsisten dengan section lain (`px-4`), link jadi **horizontal** (`flex-row flex-wrap`) semua ukuran layar, logo+tagline di kiri/atas, copyright terpusat | `f40540b` |
+| FM-02 | `/lahan` (peta Leaflet) | Peta **menembus** overlay & drawer sidebar: pane/control Leaflet (z-index 400/800) lebih tinggi dari overlay drawer | `.leaflet-container { z-index: 0; position: relative }` (membentuk stacking context) + overlay drawer `z-[1000]`, panel `z-[1010]` | `f6e809c` |
+| FM-03 | `/scan` + AI | Foto **bukan tanaman** (orang/interior) tetap dianalisis dan ditampilkan "Aman (keyakinan 38%)" — kelemahan fatal untuk demo | Gerbang domain di `ai-service`: (a) pra-cek rasio hijau vegetasi HSV < 15% → 422 "Foto bukan lahan padi/tanaman…"; (b) confidence model < 0.50 → 422 "Kualitas foto tidak cukup jelas…"; threshold jadi konstanta terdokumentasi + tampil di `/model-info`; frontend menampilkan pesan + tombol **"Ambil Ulang Foto"** (bukan lapor manual) | `9a6b2a5` |
+| FM-04 | Laporan offline (global) | Setelah kembali online, sync **tidak jalan** sampai user refresh; banner offline tidak hilang otomatis | AutoSync: tambah `visibilitychange`, retry berkala **30 dtk hanya bila antrian berisi**, deteksi "koneksi pulih" via fetch sukses; status online dibersihkan otomatis pada event `online` → banner & badge "Menunggu Sync (n)" reaktif tanpa refresh | `051a69e` |
+| FM-05 | `/login` (mobile) | Banner ilustrasi tinggi penuh di atas + form jauh di bawah → **boros scroll**; form OTP tidak terlihat tanpa scroll di 360×640 | Banner mobile diringkas jadi **~208 px** (object-cover + gradient + logo white + heading 1 baris), logo color di atas form dihilangkan di mobile, padding form diringkas → form OTP terlihat tanpa scroll di 360×640–800 | `850fa27` |
+| FM-06 | Dokumentasi | Belum ada catatan siklus uji lapangan → perbaikan | Bagian ini ditambahkan ke `docs/QA-REPORT.md` | (dokumen ini) |
+| FM-07 | `/peta` (peta Leaflet) | Sama seperti FM-02: peta menembus drawer/overlay | Diperbaiki oleh satu akar perbaikan FM-02 | `f6e809c` |
+
+**Verifikasi perbaikan (post-fix):**
+- Peta `/lahan` & `/peta`: buka drawer → peta tertutup penuh oleh overlay+drawer; klik overlay → drawer tertutup, peta tetap berfungsi normal.
+- AI: foto hijau/vegetasi lolos ke inference; foto abu-abu/kulit/putih/latar bukan tanaman ditolak 422 dengan pesan ramah; hasil confidence rendah ditolak (bukan ditampilkan sebagai kepastian).
+- Offline: offline → submit → online → **tanpa aksi apa pun** banner hilang, sync jalan, badge kembali kosong, baris terisi di Supabase.
+- Footer & login: dicek di viewport 360 px & 414 px.
+- `npm run build` sukses setelah seluruh perubahan.
+
+**Keterbatasan gerbang AI (jujur, untuk laporan):** gerbang domain FM-03 adalah **heuristik** (rasio hijau HSV + ambang keyakinan softmax), **bukan** klasifikasi in-domain/out-of-domain yang sesungguhnya. Foto dinding/pakaian hijau berpotensi lolos, dan sawah keruh/kekeringan ekstrem berpotensi tertolak. Karena itu pesan kegagalan selalu meminta foto ulang dan tidak memberi opsi laporan manual pada kasus 422. Peningkatan ke depan: model/klasifikasi domain khusus atau deteksi segmen tanaman.
