@@ -197,7 +197,7 @@ export default async function BerandaPage() {
       </section>
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-        <div className="soft-green-panel rounded-full px-6 py-5 sm:px-10 sm:py-6">
+        <div className="soft-green-panel rounded-2xl px-4 py-5 sm:rounded-full sm:px-10 sm:py-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {TRUST.map((t) => (
               <div key={t.label} className="flex items-center gap-3">

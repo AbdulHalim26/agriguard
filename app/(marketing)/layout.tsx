@@ -9,8 +9,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <main className="flex-1">{children}</main>
       <footer className="bg-[#1B5E20] text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="sm:max-w-xs">
+          <div className="flex flex-col items-center text-center gap-4">
+            <div>
               <BrandLogo variant="white" size="md" className="mb-3" />
               <p className="text-sm text-green-100">
                 Teknologi Cerdas untuk Sawah yang Lebih Terjaga.
@@ -18,7 +18,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             </div>
             <nav
               aria-label="Navigasi footer"
-              className="flex flex-row flex-wrap items-center gap-x-6 gap-y-2 text-sm text-green-100"
+              className="flex flex-row flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-green-100"
             >
               <Link href="/fitur" className="hover:text-white transition-colors">
                 Fitur
