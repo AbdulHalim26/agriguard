@@ -38,8 +38,32 @@ export function isBrowserOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false
 }
 
+// Saat browser melaporkan kembali online, langsung bersihkan status "offline
+// paksa" (yang tadi di-set karena request gagal) TANPA perlu refresh/aksi user.
+// Ini membuat banner offline hilang otomatis & memicu flush antrian lewat
+// subscribeOffline. Dipasang sekali di module scope (guard: hanya di browser).
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => markOnline())
+}
+
 export function isOfflineNow(): boolean {
   return forcedOffline || isBrowserOffline()
+}
+
+// Deteksi "koneksi pulih" dari request yang sukses: bila sebelumnya ditandai
+// offline (request gagal) lalu ada fetch apa pun yang berhasil, bersihkan status
+// offline → banner hilang & antrian otomatis di-flush (lihat subscribeOffline).
+// Dipasang sekali (idempoten) oleh AutoSync saat mount.
+let fetchPatched = false
+export function installFetchOnlineDetector(): void {
+  if (fetchPatched || typeof window === 'undefined') return
+  fetchPatched = true
+  const originalFetch = window.fetch.bind(window)
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const response = await originalFetch(input, init)
+    if (response.ok) markOnline()
+    return response
+  }
 }
 
 export function useOfflineStatus(): boolean {

@@ -123,3 +123,11 @@ export async function getReportCount(userId: string): Promise<number> {
   const reports = await db.getAllFromIndex('reports', 'by-user', userId)
   return reports.filter((r) => !r.synced).length
 }
+
+// Jumlah seluruh item tertunda (semua user/device) — dipakai AutoSync untuk
+// menentukan apakah retry berkala perlu dijalankan (hemat saat antrian kosong).
+export async function getPendingCount(): Promise<number> {
+  const db = await getOfflineDB()
+  const all = await db.getAll('reports')
+  return all.filter((r) => !r.synced).length
+}
