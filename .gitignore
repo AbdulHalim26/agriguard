@@ -54,3 +54,5 @@ ai-service/model/*
 ai-service/__pycache__/
 ai-service/*.pyc
 ai-service/.venv/
+.env
+.env*.local
