@@ -18,7 +18,7 @@ export default function MarketingNav() {
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
         <Link href="/" className="flex items-center shrink-0" aria-label="AgriGuard — Beranda">
-          <BrandLogo variant="color" size="sm" className="sm:hidden" />
+          <BrandLogo variant="color" size="md" className="sm:hidden" iconOnly />
           <BrandLogo variant="color" size="md" className="hidden sm:inline-flex" />
         </Link>
 
@@ -49,13 +49,13 @@ export default function MarketingNav() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/login"
-            className="hidden sm:inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-sm font-semibold text-[#2E7D32] border border-[#2E7D32] rounded-lg hover:bg-green-50 transition-colors"
+            className="inline-flex items-center justify-center min-h-[40px] px-3 sm:px-4 py-2 text-sm font-semibold text-[#2E7D32] border border-[#2E7D32] rounded-lg hover:bg-green-50 transition-colors"
           >
-            Login
+            Masuk
           </Link>
           <Link
-            href="/login"
-            className="inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-sm font-semibold text-white brand-gradient rounded-lg transition-colors"
+            href="/daftar"
+            className="inline-flex items-center justify-center min-h-[40px] px-3 sm:px-4 py-2 text-sm font-semibold text-white brand-gradient rounded-lg transition-colors"
           >
             Daftar
           </Link>

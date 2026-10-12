@@ -111,7 +111,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Public / protected route sets (dipakai di beberapa cabang logika di bawah).
-  const publicRoutes = ['/login', '/onboarding']
+  const publicRoutes = ['/login', '/daftar', '/onboarding']
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
   const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi', '/notifikasi', '/settings']
