@@ -78,6 +78,7 @@ export default function ScanPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [aiResult, setAiResult] = useState<AiResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [aiRetake, setAiRetake] = useState(false)
   const [aiPending, setAiPending] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [manualStatus, setManualStatus] = useState<AiStatus>('rusak_ringan')
@@ -152,6 +153,7 @@ export default function ScanPage() {
 
     setSubmitError(null)
     setAiError(null)
+    setAiRetake(false)
     setAiResult(null)
     setAiPending(false)
     setManualMode(false)
@@ -198,6 +200,8 @@ export default function ScanPage() {
       } else {
         const data = await res.json().catch(() => null)
         setAiError(data?.error || 'AI gagal menganalisis foto.')
+        // 422 = foto ditolak gerbang domain/kualitas -> tawarkan foto ulang.
+        setAiRetake(res.status === 422 || data?.retake === true)
       }
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Gagal memproses foto')
@@ -425,6 +429,7 @@ export default function ScanPage() {
                 setPhoto(null)
                 setAiResult(null)
                 setAiError(null)
+                setAiRetake(false)
                 setAiPending(false)
                 setManualMode(false)
               }}
@@ -485,18 +490,30 @@ export default function ScanPage() {
               <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
                 <AlertTriangle className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <div className="text-sm">
-                  <p className="font-medium">AI tidak dapat menganalisis foto</p>
+                  <p className="font-medium">
+                    {aiRetake ? 'Foto tidak dapat dianalisis' : 'AI tidak dapat menganalisis foto'}
+                  </p>
                   <p className="mt-0.5">{aiError}</p>
                 </div>
               </div>
-              {!manualMode && (
+              {aiRetake ? (
                 <button
-                  onClick={() => setManualMode(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-amber-300 text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  <FileWarning className="w-5 h-5" aria-hidden="true" />
-                  Gunakan Pelaporan Manual
+                  <Camera className="w-5 h-5" aria-hidden="true" />
+                  Ambil Ulang Foto
                 </button>
+              ) : (
+                !manualMode && (
+                  <button
+                    onClick={() => setManualMode(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-amber-300 text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                  >
+                    <FileWarning className="w-5 h-5" aria-hidden="true" />
+                    Gunakan Pelaporan Manual
+                  </button>
+                )
               )}
             </div>
           )}

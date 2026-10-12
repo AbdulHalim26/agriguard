@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { analyzeImage } from '@/lib/ai'
+import { analyzeImage, AiRejectedError } from '@/lib/ai'
 
 const RATE_LIMIT_PER_DAY = 20
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
@@ -83,6 +83,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[ai/analyze] gagal:', error)
     const message = error instanceof Error ? error.message : 'Gagal menganalisis gambar'
+
+    // Gerbang domain/kualitas AI: foto bukan lahan tanaman atau terlalu tidak
+    // jelas. Teruskan status 422 + pesan agar UI menawarkan "Ambil Ulang Foto"
+    // (bukan laporan manual).
+    if (error instanceof AiRejectedError) {
+      return NextResponse.json(
+        { error: message, retake: true },
+        { status: 422 }
+      )
+    }
+
     const isTimeout = message.toLowerCase().includes('timeout')
     return NextResponse.json(
       { error: message, manual: true },

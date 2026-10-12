@@ -4,6 +4,15 @@ export interface AiAnalysisResult {
   damage_pct: number
 }
 
+// Foto ditolak gerbang domain/kualitas AI (HTTP 422) — bukan kegagalan teknis.
+// Frontend menampilkan pesan + tombol "Ambil Ulang Foto" (bukan lapor manual).
+export class AiRejectedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AiRejectedError'
+  }
+}
+
 const AI_TIMEOUT_MS = 15000
 
 export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
@@ -28,9 +37,16 @@ export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
 
     clearTimeout(timeoutId)
 
+    if (response.status === 422) {
+      const body = await response.json().catch(() => null)
+      const message =
+        body?.error || body?.detail || 'Foto tidak dapat dianalisis. Ambil ulang foto.'
+      throw new AiRejectedError(message)
+    }
+
     if (!response.ok) {
       const body = await response.json().catch(() => null)
-      const message = body?.detail || `AI service error: ${response.status}`
+      const message = body?.error || body?.detail || `AI service error: ${response.status}`
       throw new Error(message)
     }
 

@@ -16,10 +16,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from predict import (
     MODEL_NAME,
     MODEL_VERSION,
+    DomainGateError,
     ModelLoadError,
     get_model_info,
     is_model_loaded,
@@ -85,6 +87,10 @@ async def predict(image: UploadFile = File(...)):
 
     try:
         return predict_image(data, image.filename or "")
+    except DomainGateError as exc:
+        # Gerbang domain/kualitas: 422 + pesan yang ditampilkan apa adanya ke
+        # pengguna (frontend menawarkan "Ambil Ulang Foto", bukan lapor manual).
+        return JSONResponse(status_code=422, content={"error": str(exc)})
     except ModelLoadError as exc:
         logger.error("Model tidak siap saat /predict: %s", exc)
         raise HTTPException(

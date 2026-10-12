@@ -12,6 +12,8 @@ Kontrak output (WAJIB, tidak berubah):
      "damage_pct": 0..100}
 
 Jika model gagal dimuat -> ModelLoadError (endpoint /predict mengembalikan 503).
+Jika foto ditolak gerbang domain/kualitas -> DomainGateError (endpoint /predict
+mengembalikan 422 + pesan ramah; lihat konstanta GERBANG DOMAIN di bawah).
 """
 
 import io
@@ -37,6 +39,28 @@ MODEL_LICENSE = "Apache-2.0"
 EVAL_ACCURACY = 0.9128
 
 CLASSES = ["aman", "rusak_ringan", "rusak_berat"]
+
+# ---------------------------------------------------------------------------
+# GERBANG DOMAIN (heuristik) — menolak foto yang jelas bukan lahan padi/tanaman
+# sebelum inference, dan menolak hasil yang terlalu tidak pasti.
+#
+# PENTING (keterbatasan jujur untuk laporan): ini BUKAN klasifikasi domain
+# (in-domain vs out-of-domain) yang sesungguhnya, melainkan heuristik murah:
+#   1) Rasio piksel "hijau vegetasi" pada ruang HSV. Foto manusia/interior/
+#      dokumen umumnya punya rasio hijau rendah sehingga tertolak lebih awal.
+#   2) Ambang keyakinan softmax model. Jika model ragu (< ambang), hasil tidak
+#      ditampilkan sebagai kepastian.
+# Heuristik bisa salah: dinding/pakaian hijau bisa lolos, dan sawah keruh/
+# kekeringan ekstrem bisa tertolak. Karena itu pesannya meminta foto ulang.
+# ---------------------------------------------------------------------------
+VEGETATION_MIN_RATIO = 0.15  # minimal 15% piksel hijau vegetasi
+CONFIDENCE_MIN = 0.50        # keyakinan model minimal agar hasil dianggap pasti
+# Ambang hue "hijau" dalam skala PIL HSV (0..255, setara ~49°..127° / warna
+# hijau-kekuningan s.d. hijau-cyan). Saturasi & value dalam 0..1.
+GREEN_HUE_MIN = 35.0
+GREEN_HUE_MAX = 90.0
+GREEN_SAT_MIN = 0.20         # saturasi minimal (0..1)
+GREEN_VAL_MIN = 0.20         # value/kecerahan minimal (0..1)
 
 # ---------------------------------------------------------------------------
 # MAPPING_CONSTANTS — pemetaan 8 label model -> 3 kelas AgriGuard
@@ -99,6 +123,11 @@ class ModelLoadError(Exception):
     """Model gagal dimuat (file hilang / rusak / onnxruntime gagal)."""
 
 
+class DomainGateError(Exception):
+    """Foto ditolak gerbang domain/kualitas (bukan lahan tanaman atau terlalu
+    tidak pasti). Endpoint /predict mengembalikan HTTP 422 dengan pesan ini."""
+
+
 def load_model():
     """Muat sesi onnxruntime sekali (idempoten). Raise ModelLoadError bila gagal."""
     global _SESSION
@@ -133,6 +162,13 @@ def get_model_info() -> dict:
         "mapping": LABEL_TO_STATUS,
         "damage_pct_range": {k: list(v) for k, v in DAMAGE_RANGE.items()},
         "eval_accuracy": EVAL_ACCURACY,
+        "domain_gate": {
+            "vegetation_min_ratio": VEGETATION_MIN_RATIO,
+            "green_hue_range_pil_0_255": [GREEN_HUE_MIN, GREEN_HUE_MAX],
+            "green_saturation_min": GREEN_SAT_MIN,
+            "green_value_min": GREEN_VAL_MIN,
+            "confidence_min": CONFIDENCE_MIN,
+        },
     }
 
 
@@ -148,6 +184,29 @@ def _preprocess(image_bytes: bytes) -> np.ndarray:
 def _softmax(x: np.ndarray) -> np.ndarray:
     e = np.exp(x - np.max(x))
     return e / e.sum()
+
+
+def _green_ratio(image_bytes: bytes) -> float:
+    """Rasio piksel hijau vegetasi (0..1) via ambang pada ruang HSV.
+
+    Hue memakai skala PIL (0..255). Rentang hijau 35..90 setara ~49°..127°,
+    mencakup hijau-kekuningan hingga hijau-cyan. Saturation & value minimal
+    menyingkirkan area gelap/abu-abu yang secara hue bisa masuk rentang hijau.
+    """
+    with Image.open(io.BytesIO(image_bytes)) as im:
+        rgb = im.convert("RGB").resize((IMAGE_SIZE, IMAGE_SIZE), PIL_RESAMPLE)
+        hsv = rgb.convert("HSV")
+    arr = np.asarray(hsv, dtype=np.float32)
+    hue = arr[..., 0]  # 0..255 (skala PIL)
+    sat = arr[..., 1] / 255.0
+    val = arr[..., 2] / 255.0
+    green = (
+        (hue >= GREEN_HUE_MIN)
+        & (hue <= GREEN_HUE_MAX)
+        & (sat >= GREEN_SAT_MIN)
+        & (val >= GREEN_VAL_MIN)
+    )
+    return float(green.mean())
 
 
 def _damage_pct(status: str, confidence: float) -> int:
@@ -179,10 +238,16 @@ def _infer(image_bytes: bytes) -> dict:
 
 
 def predict_image(image_bytes: bytes, filename: str = "") -> dict:
-    """Validasi gambar lalu kembalikan hasil klasifikasi (kontrak tetap).
+    """Validasi gambar, jalankan gerbang domain, lalu klasifikasi (kontrak tetap).
+
+    Gerbang domain (sebelum inference): rasio piksel hijau vegetasi <
+    VEGETATION_MIN_RATIO -> DomainGateError (foto bukan lahan tanaman).
+    Gerbang kualitas (setelah inference): confidence < CONFIDENCE_MIN ->
+    DomainGateError (foto terlalu tidak jelas).
 
     Raises:
         ValueError: file bukan gambar valid / terlalu besar.
+        DomainGateError: ditolak gerbang domain/kualitas (HTTP 422).
         ModelLoadError: model gagal dimuat.
     """
     if len(image_bytes) > 5 * 1024 * 1024:
@@ -193,4 +258,30 @@ def predict_image(image_bytes: bytes, filename: str = "") -> dict:
     except Exception as exc:  # noqa: BLE001
         raise ValueError("File bukan gambar yang valid") from exc
 
-    return _infer(image_bytes)
+    # Gerbang 1: pra-cek vegetasi (murah, sebelum inference).
+    green = _green_ratio(image_bytes)
+    if green < VEGETATION_MIN_RATIO:
+        logger.info(
+            "Gerbang domain: rasio hijau %.3f < %.2f — foto ditolak",
+            green,
+            VEGETATION_MIN_RATIO,
+        )
+        raise DomainGateError(
+            "Foto bukan lahan padi/tanaman. Ambil foto sawah yang jelas."
+        )
+
+    result = _infer(image_bytes)
+
+    # Gerbang 2: tolak hasil yang terlalu tidak pasti (jangan jual kepastian).
+    if result["confidence"] < CONFIDENCE_MIN:
+        logger.info(
+            "Gerbang kualitas: confidence %.4f < %.2f — foto ditolak",
+            result["confidence"],
+            CONFIDENCE_MIN,
+        )
+        raise DomainGateError(
+            "Kualitas foto tidak cukup jelas untuk dianalisis. "
+            "Ambil foto lebih dekat & terang."
+        )
+
+    return result
