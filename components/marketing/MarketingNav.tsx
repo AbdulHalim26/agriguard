@@ -18,11 +18,14 @@ export default function MarketingNav() {
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
         <Link href="/" className="flex items-center shrink-0" aria-label="AgriGuard — Beranda">
-          <BrandLogo variant="color" size="md" className="sm:hidden" iconOnly />
+          <BrandLogo variant="color" size="sm" className="sm:hidden" />
           <BrandLogo variant="color" size="md" className="hidden sm:inline-flex" />
         </Link>
 
-        <nav className="flex-1 flex items-center justify-center gap-1 overflow-x-auto" aria-label="Navigasi">
+        <nav
+          className="flex-1 flex items-center justify-start sm:justify-center gap-1 overflow-x-auto no-scrollbar"
+          aria-label="Navigasi"
+        >
           {LINKS.map((l) => {
             const active = l.href === '/' ? pathname === '/' : pathname.startsWith(l.href)
             return (

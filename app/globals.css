@@ -47,6 +47,15 @@
   .touch-target {
     @apply min-h-[48px] min-w-[48px];
   }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* ===== Gradient & panel system AgriGuard (section E) ===== */
