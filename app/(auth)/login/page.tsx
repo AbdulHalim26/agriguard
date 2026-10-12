@@ -147,7 +147,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex flex-col lg:grid lg:grid-cols-2">
-      <div className="relative h-60 lg:h-auto overflow-hidden">
+      <div className="relative h-52 lg:h-auto overflow-hidden">
         <Image
           src="/ilustrations/hero-tentang.jpg"
           alt=""
@@ -157,8 +157,13 @@ function LoginForm() {
           className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#1B5E20] via-[#1B5E20]/80 to-[#2E7D32]/40 lg:via-[#1B5E20]/65 lg:to-[#2E7D32]/25" />
-        <div className="relative h-full flex flex-col justify-between p-6 lg:p-10 xl:p-14 text-white">
+        <div className="relative h-full flex flex-col justify-between p-4 lg:p-10 xl:p-14 text-white">
           <BrandLogo variant="white" size="lg" />
+
+          {/* Heading ringkas untuk mobile (desktop memakai blok lengkap di bawah) */}
+          <h2 className="lg:hidden text-base font-bold leading-snug max-w-[280px]">
+            Kita Jaga Masa Depan Pertanian Indonesia
+          </h2>
 
           <div className="hidden lg:block">
             <h2 className="text-2xl xl:text-3xl font-bold leading-tight mb-6">
@@ -189,9 +194,9 @@ function LoginForm() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-white px-4 py-10 lg:py-12">
+      <div className="flex-1 flex items-center justify-center bg-white px-4 py-8 lg:py-12">
         <div className="w-full max-w-md">
-          <div className="flex justify-center mb-6">
+          <div className="hidden lg:flex justify-center mb-6">
             <BrandLogo variant="color" size="md" />
           </div>
           <h1 className="text-2xl font-bold text-center text-[#0B2545]">
