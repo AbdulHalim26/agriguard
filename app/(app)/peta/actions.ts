@@ -35,7 +35,7 @@ export async function getPetaData(): Promise<{
   data: PetaData | null
   error: string | null
 }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const {
     data: { user },

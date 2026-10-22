@@ -4,7 +4,7 @@ Platform peringatan dini banjir sawah hiper-lokal dengan AI untuk petani dan PPL
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router) + TypeScript
+- **Frontend**: Next.js 15 (App Router) + React 19 + TypeScript
 - **UI**: Tailwind CSS + shadcn/ui
 - **Backend/DB/Auth/Storage**: Supabase (Postgres + RLS + Auth + Storage)
 - **Maps**: Leaflet + OpenStreetMap
@@ -15,8 +15,8 @@ Platform peringatan dini banjir sawah hiper-lokal dengan AI untuk petani dan PPL
 
 ### Prerequisites
 
-- Node.js 18+
-- npm/yarn/pnpm
+- Node.js 24 LTS, minimal **24.22.1** (versi lokal tercatat di `.nvmrc`)
+- npm (gunakan `package-lock.json` untuk instalasi yang konsisten)
 - Supabase account
 
 ### Installation
@@ -24,7 +24,7 @@ Platform peringatan dini banjir sawah hiper-lokal dengan AI untuk petani dan PPL
 1. Clone the repository
 2. Install dependencies:
    ```bash
-   npm install
+   npm ci
    ```
 3. Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
    ```bash
@@ -209,7 +209,24 @@ Poktan invite code: `DEMO01`
 
 1. Connect repository to Vercel
 2. Add environment variables
-3. Deploy
+3. Push ke `main` untuk auto-deploy. `engines.node` di `package.json` memilih
+   Node.js 24; Vercel mengelola pembaruan minor/patch runtime.
+
+### Security Updates
+
+- Jika memakai nvm, jalankan `nvm install` lalu `nvm use` sebelum `npm ci`.
+- Jalankan `npm run audit:prod` untuk audit dependensi produksi, `npm audit`
+  untuk audit termasuk tooling, dan `npm run build` untuk build + type-check.
+- `overrides.next.postcss` menyamakan PostCSS bawaan Next.js dengan versi 8.x
+  yang sudah ditambal di `devDependencies`, agar salinan transitif lama tidak
+  ikut terpasang.
+- Hasil pemeriksaan **23 Oktober 2026**: audit produksi **0 kerentanan**;
+  audit penuh masih **9 temuan tooling** (7 high, 2 moderate) pada rantai
+  Tailwind CSS/ESLint. Sumbernya adalah
+  [`braces` (belum ada patch resmi)](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+  dan [`postcss-selector-parser`](https://github.com/advisories/GHSA-rj75-hqrm-r3gf).
+  Tindak lanjut: perbarui rantai tooling ketika tersedia rilis kompatibel;
+  migrasi major Tailwind perlu verifikasi tampilan tersendiri.
 
 ### Hugging Face Spaces (AI Service)
 

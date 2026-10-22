@@ -22,7 +22,7 @@ export type LahanWithPolygon = {
 }
 
 export async function listMyLahan(): Promise<{ data: LahanWithPolygon[] | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -44,7 +44,7 @@ export async function listMyLahan(): Promise<{ data: LahanWithPolygon[] | null; 
 }
 
 export async function createLahan(input: LahanInput): Promise<{ data: LahanWithPolygon | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -93,7 +93,7 @@ export async function updateLahan(
   id: string,
   input: Partial<LahanInput>
 ): Promise<{ data: LahanWithPolygon | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

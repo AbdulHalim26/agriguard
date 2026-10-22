@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getSupabaseConfig, supabaseNotConfiguredMessage } from './env'
 
-function parseMockSession(cookieStore: ReturnType<typeof cookies>) {
+function parseMockSession(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   const sessionCookie = cookieStore.get('agriguard-mock-session')
   if (sessionCookie) {
     try {
@@ -120,8 +120,8 @@ function createMockSupabaseClient(mockUser: any) {
   } as any
 }
 
-export function createClient() {
-  const cookieStore = cookies()
+export async function createClient() {
+  const cookieStore = await cookies()
   const { url, anonKey, isConfigured } = getSupabaseConfig()
 
   const mockUser = parseMockSession(cookieStore)

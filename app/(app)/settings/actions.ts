@@ -17,7 +17,7 @@ const schema = z.object({
 export async function updateFullName(
   fullName: string
 ): Promise<{ error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const {
     data: { user },

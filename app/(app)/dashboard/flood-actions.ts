@@ -19,7 +19,7 @@ export interface FloodStatusData {
 export async function getFloodStatus(
   coords?: { lat: number; lon: number }
 ): Promise<{ data: FloodStatusData | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

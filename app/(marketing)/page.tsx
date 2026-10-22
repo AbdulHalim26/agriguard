@@ -62,7 +62,7 @@ const TRUST = [
 ]
 
 export default async function BerandaPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

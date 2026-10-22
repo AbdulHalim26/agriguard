@@ -34,7 +34,7 @@ export async function listAuditLogs(): Promise<{
   data: AuditLog[] | null
   error: string | null
 }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { user, error: guardError } = await requirePplDinas(supabase)
   if (!user) return { data: null, error: guardError }

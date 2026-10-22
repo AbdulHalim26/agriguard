@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export default async function VerifikasiPage({
   searchParams,
 }: {
-  searchParams: { tab?: string }
+  searchParams: Promise<{ tab?: string }>
 }) {
   let userId: string | null = null
   let fullName: string | null = null
@@ -16,7 +16,7 @@ export default async function VerifikasiPage({
   let loadFailed = false
 
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data } = await supabase.auth.getUser()
     userId = data.user?.id ?? null
 
@@ -51,10 +51,8 @@ export default async function VerifikasiPage({
     redirect('/dashboard')
   }
 
-  const initialTab =
-    searchParams?.tab === 'reports' || searchParams?.tab === 'rekap'
-      ? searchParams.tab
-      : 'water'
+  const { tab } = await searchParams
+  const initialTab = tab === 'reports' || tab === 'rekap' ? tab : 'water'
 
   return (
     <div className="min-h-screen bg-gray-50 print:bg-white">

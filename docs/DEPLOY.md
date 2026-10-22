@@ -17,10 +17,11 @@ server-side env `AI_API_URL`. Database & storage di Supabase. Cuaca dari OpenWea
 ## Web — Vercel
 
 - Framework: **Next.js** (project `agriguard`, scope team `abdulhalim26s-projects`).
-- Deploy dari CLI (root repo = app Next.js):
-  ```bash
-  vercel --prod
-  ```
+- Runtime: **Node.js 24 LTS** (`engines.node: ^24.22.1` di `package.json`).
+  Lokal memakai patch **24.22.1** dari `.nvmrc`. Vercel memilih major 24 dan
+  mengelola rollout minor/patch secara otomatis; versi patch produksi dapat
+  diperiksa lewat `node -v` di build log.
+- Auto-deploy aktif: push ke branch `main` memicu build dan deploy produksi.
 - Environment Variables (Production) — nilai di-set di dashboard/CLI, tidak di repo:
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -31,10 +32,6 @@ server-side env `AI_API_URL`. Database & storage di Supabase. Cuaca dari OpenWea
   - `NEXT_PUBLIC_APP_URL` = `https://agriguard-five.vercel.app`
 - `next.config.js`: `images.remotePatterns` sudah mengizinkan `*.supabase.co` dan
   `serverActions.bodySizeLimit = '5mb'`.
-- **Catatan Git:** project Vercel belum terhubung ke repo GitHub (koneksi GitHub App
-  gagal saat `vercel link`). Untuk auto-deploy tiap push, hubungkan lewat
-  **Vercel Dashboard → Project → Settings → Git** (butuh otorisasi GitHub App).
-  Sementara ini deploy dilakukan manual dengan `vercel --prod`.
 - `NEXT_PUBLIC_*` bersifat build-time: setelah mengubahnya, **wajib redeploy**.
 
 ## AI service — Render
@@ -44,9 +41,7 @@ server-side env `AI_API_URL`. Database & storage di Supabase. Cuaca dari OpenWea
 - Build context: `./ai-service` (Dockerfile `./ai-service/Dockerfile`).
 - Model: `ai-service/model/model.onnx` (EfficientNet-B0, ~16 MB) ikut ter-commit di git.
 - Endpoint: `GET /health`, `GET /model-info`, `POST /predict` (multipart `image`).
-- Auto-deploy: `autoDeploy: true` → setiap push ke `main` memicu rebuild Render
-  **bila** service dihubungkan sebagai Blueprint ke repo. Jika dibuat via API
-  (seperti sekarang), picu manual dari dashboard (**Manual Deploy → Deploy latest commit**).
+- Auto-deploy aktif: `autoDeploy: true` → push ke `main` memicu build dan deploy Render.
 - Verifikasi cepat:
   ```bash
   curl https://agriguard-ai-96hh.onrender.com/health          # {"status":"ok","model_loaded":true}
@@ -73,17 +68,19 @@ masih memuat frontmatter Space HF (tidak dipakai lagi; bisa diabaikan).
 
 ## Re-deploy ringkas
 
-Web:
+Sebelum push, verifikasi dengan runtime proyek:
 ```bash
-git pull
-vercel --prod
+nvm install
+nvm use
+npm ci
+npm run audit:prod
+npm run build
 ```
 
-AI (jika terhubung ke Render sebagai Blueprint):
+Setelah perubahan di-commit, deploy web dan AI dipicu otomatis:
 ```bash
-git push origin main   # Render auto-deploy
+git push origin main
 ```
-Atau manual: Render Dashboard → `agriguard-ai` → **Manual Deploy**.
 
 ## Testing manual yang disarankan (browser/HP)
 

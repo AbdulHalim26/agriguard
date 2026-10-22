@@ -21,7 +21,7 @@ export type WaterLevelData = {
 export async function upsertWaterLevel(
   input: WaterLevelInput
 ): Promise<{ data: WaterLevelData | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -67,7 +67,7 @@ export async function upsertWaterLevel(
 }
 
 export async function listWaterLevels(): Promise<{ data: WaterLevelData[] | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -87,7 +87,7 @@ export async function listWaterLevels(): Promise<{ data: WaterLevelData[] | null
 }
 
 export async function getLatestWaterLevel(district?: string): Promise<{ data: WaterLevelData | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   let query = supabase
     .from('water_levels')

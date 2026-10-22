@@ -44,7 +44,7 @@ export interface ReportItem {
 export async function submitReport(
   formData: FormData
 ): Promise<{ data: { id: string } | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const {
@@ -219,7 +219,7 @@ export async function listMyReports(): Promise<{
   data: ReportItem[] | null
   error: string | null
 }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const {
     data: { user },

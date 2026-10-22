@@ -58,7 +58,7 @@ export async function listVerificationReports(): Promise<{
   data: VerificationReport[] | null
   error: string | null
 }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { user, error: guardError } = await requirePplDinas(supabase)
   if (!user) {
@@ -115,7 +115,7 @@ export async function listVerificationReports(): Promise<{
 }
 
 export async function getPendingReportCount(): Promise<{ count: number; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { user, error: guardError } = await requirePplDinas(supabase)
   if (!user) return { count: 0, error: guardError }
@@ -140,7 +140,7 @@ export async function getReportStats(): Promise<{
   data: ReportStats | null
   error: string | null
 }> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { user, error: guardError } = await requirePplDinas(supabase)
   if (!user) return { data: null, error: guardError }
@@ -175,7 +175,7 @@ export async function getReportStats(): Promise<{
 export async function setVerification(
   input: VerificationInput
 ): Promise<{ data: { id: string; is_verified: boolean } | null; error: string | null }> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const { user, error: guardError } = await requirePplDinas(supabase)

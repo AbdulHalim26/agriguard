@@ -6,7 +6,7 @@ import { analyzeImage } from '@/lib/ai'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const admin = createAdminClient()
 
     const {

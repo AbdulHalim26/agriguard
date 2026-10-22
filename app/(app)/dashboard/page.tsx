@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   let loadFailed = false
 
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data } = await supabase.auth.getUser()
     userId = data.user?.id ?? null
 
