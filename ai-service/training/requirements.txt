@@ -1,0 +1,8 @@
+# Training/export only; do not add these packages to the AI runtime image.
+# Colab already supplies a compatible torch/torchvision pair. Install together.
+torch>=2.5,<3
+torchvision>=0.20,<1
+pillow>=10.3,<13
+numpy>=1.26,<3
+onnx>=1.17,<2
+onnxruntime>=1.18,<2

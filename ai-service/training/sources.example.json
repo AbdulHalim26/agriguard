@@ -1,0 +1,56 @@
+{
+  "description": "Kandidat terverifikasi 23 Oktober 2026, bukan dataset banjir tiga kelas siap pakai. Aktifkan hanya sumber yang sudah diunduh dan dilabel ulang melalui CSV. Jumlah pada katalog bukan jumlah gambar training; prepare menghitung ulang gambar unik.",
+  "sources": [
+    {
+      "id": "roboflow_wet_rice",
+      "enabled": false,
+      "name": "Wet Rice — no / Roboflow Universe",
+      "url": "https://universe.roboflow.com/no-85bd3/wet-rice-lvtac",
+      "license": "CC-BY-4.0",
+      "kind": "flood_paddy",
+      "version": 1,
+      "catalog_reported_images": 1377,
+      "caveat": "Satu label asal Wet, bukan label kerusakan banjir. Tinjau apakah setiap foto benar padi di lahan tergenang; keluarkan foto yang tidak relevan dan label ulang severity. Verifikasi versi ekspor; frame video satu rekaman harus satu group_id.",
+      "download_url_env": "ROBOFLOW_WET_RICE_ZIP_URL",
+      "local_dir": "/content/raw/wet-rice",
+      "annotations": "annotations/wet-rice-reviewed.csv",
+      "labels_reviewed": false,
+      "reviewed_by": "",
+      "review_protocol": ""
+    },
+    {
+      "id": "roboflow_rice_crop_damage",
+      "enabled": false,
+      "name": "Rice Crop Damage — root / Roboflow Universe",
+      "url": "https://universe.roboflow.com/root-knimz/rice-crop-damage",
+      "license": "CC-BY-4.0",
+      "kind": "disease_support",
+      "version": null,
+      "catalog_reported_images": 533,
+      "caveat": "Label asal instance segmentation: damage/leaf. Halaman belum menyediakan dataset version saat diperiksa; perlu fork/ekspor manual. Tidak ada bukti penyebab banjir; hanya kandidat pendukung setelah review tingkat kerusakan visual. Banyak gambar sudah augmented: kelompokkan dengan gambar asal.",
+      "download_url_env": "ROBOFLOW_RICE_DAMAGE_ZIP_URL",
+      "local_dir": "/content/raw/rice-crop-damage",
+      "annotations": "annotations/rice-damage-reviewed.csv",
+      "labels_reviewed": false,
+      "reviewed_by": "",
+      "review_protocol": ""
+    },
+    {
+      "id": "kaggle_rice_leaf_disease",
+      "enabled": false,
+      "name": "Rice Leaf Disease Images — Nirmal Sankalana; atribusi dataset asal Prabira Kumar Sethy dkk.",
+      "url": "https://www.kaggle.com/datasets/nirmalsankalana/rice-leaf-disease-image",
+      "license": "CC0-1.0 (metadata Kaggle; pertahankan atribusi penulis asal)",
+      "kind": "disease_support",
+      "kaggle_dataset": "nirmalsankalana/rice-leaf-disease-image",
+      "version": 1,
+      "catalog_reported_images": 5932,
+      "caveat": "Empat label penyakit: Bacterial blight, Blast, Brown Spot, Tungro. Bukan data banjir. Tidak dipetakan otomatis dari nama penyakit ke severity; CSV wajib hasil review visual. Hanya masuk train, tidak val/test banjir.",
+      "local_dir": "/content/raw/rice-leaf-disease",
+      "annotations": "annotations/rice-leaf-reviewed.csv",
+      "labels_reviewed": false,
+      "reviewed_by": "",
+      "review_protocol": ""
+    }
+  ]
+}
