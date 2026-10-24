@@ -15,7 +15,7 @@ export class AiRejectedError extends Error {
 
 const AI_TIMEOUT_MS = 15000
 
-export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
+export async function analyzeImage(image: Blob, timeoutMs = AI_TIMEOUT_MS): Promise<AiAnalysisResult> {
   const aiApiUrl = process.env.AI_API_URL?.trim()
 
   if (!aiApiUrl) {
@@ -26,7 +26,7 @@ export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
   formData.append('image', image, 'scan.jpg')
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/predict`, {
@@ -34,8 +34,6 @@ export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
       body: formData,
       signal: controller.signal,
     })
-
-    clearTimeout(timeoutId)
 
     if (response.status === 422) {
       const body = await response.json().catch(() => null)
@@ -68,11 +66,12 @@ export async function analyzeImage(image: Blob): Promise<AiAnalysisResult> {
       damage_pct: data.damage_pct,
     }
   } catch (error) {
-    clearTimeout(timeoutId)
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Timeout: AI tidak merespons dalam 15 detik')
+      throw new Error(`Timeout: AI tidak merespons dalam ${Math.round(timeoutMs / 1000)} detik`)
     }
     throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 

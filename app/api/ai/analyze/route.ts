@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { analyzeImage, AiRejectedError } from '@/lib/ai'
 
+export const maxDuration = 90
+// Sisakan waktu untuk auth/upload dan pengiriman respons sebelum timeout klien.
+const SCAN_AI_TIMEOUT_MS = 85_000
+
 const RATE_LIMIT_PER_DAY = 20
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await analyzeImage(file)
+    const result = await analyzeImage(file, SCAN_AI_TIMEOUT_MS)
     return NextResponse.json(result)
   } catch (error) {
     console.error('[ai/analyze] gagal:', error)

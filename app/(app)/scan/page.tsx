@@ -48,6 +48,7 @@ const ScanMap = dynamic(() => import('./ScanMap'), {
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
 const LAHAN_CACHE_KEY = 'agriguard-lahan-cache'
+const SCAN_TIMEOUT_MS = 90_000
 
 interface AiResult {
   status: AiStatus
@@ -73,6 +74,9 @@ export default function ScanPage() {
 
   const [photo, setPhoto] = useState<PhotoState | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analysisMessage, setAnalysisMessage] = useState('Mengunggah foto…')
+  const analysisControllerRef = useRef<AbortController | null>(null)
+  const photoVersionRef = useRef(0)
   const [aiResult, setAiResult] = useState<AiResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiRetake, setAiRetake] = useState(false)
@@ -144,7 +148,88 @@ export default function ScanPage() {
     }
   }, [photo])
 
+  const cancelAnalysis = useCallback(() => {
+    photoVersionRef.current += 1
+    const controller = analysisControllerRef.current
+    analysisControllerRef.current = null
+    controller?.abort()
+  }, [])
+
+  useEffect(() => cancelAnalysis, [cancelAnalysis])
+
+  const analyzePhoto = useCallback(async (blob: Blob) => {
+    cancelAnalysis()
+    setAiError(null)
+    setAiRetake(false)
+    setAiResult(null)
+    setManualMode(false)
+    setAiPending(false)
+
+    if (isOfflineNow()) {
+      setAnalyzing(false)
+      setAiPending(true)
+      return
+    }
+
+    const controller = new AbortController()
+    analysisControllerRef.current = controller
+    setAnalyzing(true)
+    setAnalysisMessage('Mengunggah foto…')
+    const timeout = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS)
+    const analyzingStage = window.setTimeout(() => {
+      if (analysisControllerRef.current === controller) setAnalysisMessage('Menganalisis dengan AI…')
+    }, 2_000)
+    const finishingStage = window.setTimeout(() => {
+      if (analysisControllerRef.current === controller) setAnalysisMessage('Hampir selesai…')
+    }, 45_000)
+
+    try {
+      const form = new FormData()
+      form.append('image', blob, 'scan.jpg')
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST', body: form, signal: controller.signal,
+      })
+      const data = await res.json()
+      if (analysisControllerRef.current !== controller) return
+
+      if (res.ok) {
+        if (!AI_STATUS_LIST.includes(data?.status) ||
+            !Number.isFinite(data?.confidence) || data.confidence < 0 || data.confidence > 1 ||
+            !Number.isFinite(data?.damage_pct) || data.damage_pct < 0 || data.damage_pct > 100) {
+          throw new Error('Invalid analysis response')
+        }
+        setAiResult({ status: data.status, confidence: data.confidence, damage_pct: data.damage_pct })
+      } else if (res.status === 422 || data?.retake === true) {
+        setAiRetake(true)
+        setAiError('Foto ini belum dapat dianalisis. Ambil ulang foto padi yang lebih jelas, dekat, dan cukup terang.')
+      } else if (res.status === 401 || res.status === 403) {
+        setAiError('Sesi Anda perlu diperbarui. Silakan masuk kembali, lalu coba lagi.')
+      } else if (res.status === 429) {
+        setAiError('Batas analisis hari ini sudah tercapai. Anda tetap dapat menggunakan pelaporan manual.')
+      } else {
+        setAiError('Layanan AI belum merespons. Tunggu sebentar, lalu tekan Coba Lagi. Foto Anda tetap tersedia.')
+      }
+    } catch {
+      if (analysisControllerRef.current !== controller) return
+      setAiError(controller.signal.aborted
+        ? 'Analisis melewati 90 detik. Tunggu sebentar, lalu tekan Coba Lagi. Foto Anda tetap tersedia.'
+        : 'Analisis belum berhasil. Periksa koneksi Anda, lalu tekan Coba Lagi. Foto Anda tetap tersedia.')
+    } finally {
+      window.clearTimeout(timeout)
+      window.clearTimeout(analyzingStage)
+      window.clearTimeout(finishingStage)
+      if (analysisControllerRef.current === controller) {
+        analysisControllerRef.current = null
+        setAnalyzing(false)
+      }
+    }
+  }, [cancelAnalysis])
+
   const handleFile = useCallback(async (file: File) => {
+    cancelAnalysis()
+    const photoVersion = photoVersionRef.current
+    setAnalyzing(false)
+    setPhoto(null)
     // Kunci idempotency baru per foto. Ini memastikan tiap laporan (termasuk
     // saat offline, tanpa meninggalkan halaman) dapat identitas unik sehingga
     // entri antrian IndexedDB tidak saling menimpa. Retry laporan yang sama
@@ -174,44 +259,21 @@ export default function ScanPage() {
 
     try {
       const blob = await compressImage(file, 1280, 0.85)
+      if (photoVersionRef.current !== photoVersion) return
       setPhoto({
         blob,
         previewUrl: URL.createObjectURL(blob),
         name: blob.type === 'image/png' ? 'scan.png' : 'scan.jpg',
       })
 
-      // Offline: AI belum bisa dijalankan. Laporan tetap bisa dikirim (masuk
-      // antrian) dengan ai_status NULL; server menjalankan analisis saat sync
-      // (lihat /api/sync). UI menandai "Menunggu Analisis AI".
-      if (isOfflineNow()) {
-        setAiPending(true)
-        return
-      }
-
-      setAnalyzing(true)
-      const form = new FormData()
-      form.append('image', blob, 'scan.jpg')
-
-      const res = await fetch('/api/ai/analyze', { method: 'POST', body: form })
-      if (res.ok) {
-        const data = await res.json()
-        setAiResult({
-          status: data.status as AiStatus,
-          confidence: data.confidence,
-          damage_pct: data.damage_pct,
-        })
-      } else {
-        const data = await res.json().catch(() => null)
-        setAiError(data?.error || 'AI gagal menganalisis foto.')
-        // 422 = foto ditolak gerbang domain/kualitas -> tawarkan foto ulang.
-        setAiRetake(res.status === 422 || data?.retake === true)
-      }
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'Gagal memproses foto')
-    } finally {
-      setAnalyzing(false)
+      // Blob yang sama dipakai untuk analisis, retry, Storage, dan antrean offline.
+      await analyzePhoto(blob)
+    } catch {
+      if (photoVersionRef.current !== photoVersion) return
+      setAiRetake(true)
+      setAiError('Foto belum dapat diproses. Silakan pilih foto JPG/PNG lain atau ambil ulang foto.')
     }
-  }, [])
+  }, [analyzePhoto, cancelAnalysis])
 
   const handleGetLocation = useCallback(() => {
     if (!('geolocation' in navigator)) {
@@ -405,6 +467,7 @@ export default function ScanPage() {
               </button>
             </div>
           </div>
+          {aiError && <p className="mt-4 text-sm text-red-700" role="alert">{aiError}</p>}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -429,6 +492,8 @@ export default function ScanPage() {
             </span>
             <button
               onClick={() => {
+                cancelAnalysis()
+                setAnalyzing(false)
                 setPhoto(null)
                 setAiResult(null)
                 setAiError(null)
@@ -443,9 +508,12 @@ export default function ScanPage() {
           </div>
 
           {analyzing && (
-            <div className="p-6 flex items-center gap-3 text-gray-600">
+            <div className="p-6 flex items-center gap-3 text-gray-600" role="status" aria-live="polite">
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-              <span>Menganalisis foto dengan AI...</span>
+              <div>
+                <p>{analysisMessage}</p>
+                <p className="mt-1 text-xs text-gray-500">Proses pertama dapat memerlukan waktu hingga 90 detik.</p>
+              </div>
             </div>
           )}
 
@@ -508,15 +576,24 @@ export default function ScanPage() {
                   Ambil Ulang Foto
                 </button>
               ) : (
-                !manualMode && (
+                <>
                   <button
-                    onClick={() => setManualMode(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-amber-300 text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                    onClick={() => { if (photo) void analyzePhoto(photo.blob) }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <FileWarning className="w-5 h-5" aria-hidden="true" />
-                    Gunakan Pelaporan Manual
+                    <RefreshCw className="w-5 h-5" aria-hidden="true" />
+                    Coba Lagi
                   </button>
-                )
+                  {!manualMode && (
+                    <button
+                      onClick={() => setManualMode(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-amber-300 text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                    >
+                      <FileWarning className="w-5 h-5" aria-hidden="true" />
+                      Gunakan Pelaporan Manual
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
