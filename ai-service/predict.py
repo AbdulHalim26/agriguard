@@ -113,7 +113,7 @@ OUTPUT_NAME = _METADATA.get("output_name", "logits")
 # kekeringan ekstrem bisa tertolak. Karena itu pesannya meminta foto ulang.
 # ---------------------------------------------------------------------------
 VEGETATION_MIN_RATIO = 0.15  # minimal 15% piksel hijau vegetasi
-CONFIDENCE_MIN = 0.50        # keyakinan model minimal agar hasil dianggap pasti
+CONFIDENCE_MIN = 0.35        # diturunkan hasil uji lapangan: foto nyata sebelumnya selalu ditolak gerbang
 # Ambang hue "hijau" dalam skala PIL HSV (0..255, setara ~49°..127° / warna
 # hijau-kekuningan s.d. hijau-cyan). Saturasi & value dalam 0..1.
 GREEN_HUE_MIN = 35.0
