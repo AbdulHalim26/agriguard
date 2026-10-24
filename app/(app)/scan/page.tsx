@@ -141,6 +141,12 @@ export default function ScanPage() {
     loadLahan()
   }, [loadLahan])
 
+  useEffect(() => {
+    return () => {
+      if (photo) URL.revokeObjectURL(photo.previewUrl)
+    }
+  }, [photo])
+
   const handleFile = useCallback(async (file: File) => {
     // Kunci idempotency baru per foto. Ini memastikan tiap laporan (termasuk
     // saat offline, tanpa meninggalkan halaman) dapat identitas unik sehingga
@@ -170,7 +176,7 @@ export default function ScanPage() {
     }
 
     try {
-      const blob = await compressImage(file, 1280, 0.8)
+      const blob = await compressImage(file, 1280, 0.85)
       setPhoto({
         blob,
         previewUrl: URL.createObjectURL(blob),

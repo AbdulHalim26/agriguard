@@ -29,36 +29,42 @@ export function validateGeofence(
 export async function compressImage(
   file: File,
   maxDimension: number = 1280,
-  quality: number = 0.8
+  quality: number = 0.85
 ): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
+  let bitmap: ImageBitmap | undefined
+  let objectUrl: string | undefined
 
-    if (!ctx) {
-      reject(new Error('Canvas context tidak tersedia'))
-      return
+  try {
+    // Terapkan EXIF sekali saat decode (termasuk foto kamera yang diputar).
+    if (typeof createImageBitmap === 'function') {
+      try {
+        bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      } catch {
+        // Browser yang belum mendukung opsi ini memakai decoder <img> di bawah.
+      }
     }
 
-    img.onload = () => {
-      let { width, height } = img
+    const image = bitmap ?? await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error('Gagal memuat gambar'))
+      // Decoder <img> browser modern menerapkan orientasi EXIF secara otomatis.
+      objectUrl = URL.createObjectURL(file)
+      img.src = objectUrl
+    })
+    const width = image instanceof HTMLImageElement ? image.naturalWidth : image.width
+    const height = image instanceof HTMLImageElement ? image.naturalHeight : image.height
+    if (!width || !height) throw new Error('Ukuran gambar tidak valid')
 
-      if (width > maxDimension || height > maxDimension) {
-        if (width > height) {
-          height = Math.round((height * maxDimension) / width)
-          width = maxDimension
-        } else {
-          width = Math.round((width * maxDimension) / height)
-          height = maxDimension
-        }
-      }
+    const scale = Math.min(1, maxDimension / Math.max(width, height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(width * scale))
+    canvas.height = Math.max(1, Math.round(height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas context tidak tersedia')
 
-      canvas.width = width
-      canvas.height = height
-
-      ctx.drawImage(img, 0, 0, width, height)
-
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+    return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
           if (blob) {
@@ -70,11 +76,11 @@ export async function compressImage(
         'image/jpeg',
         quality
       )
-    }
-
-    img.onerror = () => reject(new Error('Gagal memuat gambar'))
-    img.src = URL.createObjectURL(file)
-  })
+    })
+  } finally {
+    bitmap?.close()
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
+  }
 }
 
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
