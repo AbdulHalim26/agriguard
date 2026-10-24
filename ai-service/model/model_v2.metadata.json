@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "model_version": "v2",
+  "architecture": "torchvision.efficientnet_b0",
+  "label_schema": "v2_3label",
+  "labels": [
+    "tanpa_kerusakan_terlihat",
+    "kerusakan_ringan_terlihat",
+    "kerusakan_berat_terlihat"
+  ],
+  "label_to_status": {
+    "tanpa_kerusakan_terlihat": "aman",
+    "kerusakan_ringan_terlihat": "rusak_ringan",
+    "kerusakan_berat_terlihat": "rusak_berat"
+  },
+  "preprocessing": {
+    "image_size": 224,
+    "resize": "bicubic",
+    "color_mode": "RGB",
+    "rescale": 0.00392156862745098,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "exif_transpose": true
+  },
+  "domain_gate": {
+    "vegetation_min_ratio": 0.15,
+    "confidence_min": 0.5
+  },
+  "damage_pct_range": {
+    "aman": [
+      0,
+      15
+    ],
+    "rusak_ringan": [
+      30,
+      60
+    ],
+    "rusak_berat": [
+      60,
+      95
+    ]
+  },
+  "damage_pct_estimation": {
+    "method": "confidence_scaled_status_range",
+    "calibrated_against_measured_damage": false,
+    "maximum": 95,
+    "context": "v1 memetakan penyakit ke status; v2 memetakan tingkat kerusakan visual langsung ke status. Rentang dan rumus kompatibel dengan v1, bukan pengukuran persen luas rusak, kehilangan hasil, atau bukti penyebab banjir."
+  },
+  "trained_on": "2026-10-24T13:06:26.419466+00:00",
+  "purpose": "model_training",
+  "ready_for_integration": true,
+  "checkpoint_sha256": "2269961f47d4a5afb48cb35e3d0a6590baaa48d44dd1829b9985f56744da9af5",
+  "manifest_sha256": "3b6dfa979b4ca03a83111e494f36c00468ff289bb99239c94fa5fe3369c6bd73",
+  "split_id": "22d2d7e378fc6a98569d47e1fff6869195dde0de486645860706fdd33eaf4003",
+  "metrics_sha256": "2b902fcd00fcad5b19792833c76343b2fad64e3c7fb73f88980a1b0e864a96f8",
+  "onnx_sha256": "76fa287c4cead145f975cefc64602f5ca98a470bc3ff0f330745fc76ca68c50f",
+  "input_name": "pixel_values",
+  "output_name": "logits",
+  "export_verification": {
+    "verified": true,
+    "checked_at": "2026-10-24T13:08:44.216285+00:00",
+    "opset": 14,
+    "atol": 1e-05,
+    "rtol": 0.0001,
+    "max_absolute_logit_difference": 1.2516975402832031e-06,
+    "cases": 5,
+    "random_batch_sizes": [
+      1,
+      2
+    ],
+    "validation_sample_ids": [
+      "015bd8d3eb4cccdc138308a741e2f2c191632b119bb6b2f8054bdbb5c5cd9978",
+      "08d20481cd472bec4fe084c229858846735634baadd62ba36d53c645bd829fb7",
+      "01ec815421ab2a84446f51f9ff18b30804514084969cf9113c046eba1d86d527"
+    ],
+    "scope": "FP32 logits on random inputs and one real validation tensor per label; not a model accuracy claim",
+    "versions": {
+      "torch": "2.11.0+cu130",
+      "onnx": "1.23.2",
+      "onnxruntime": "1.31.0"
+    }
+  }
+}

@@ -1,22 +1,28 @@
-"""Prediksi kerusakan daun padi dengan model klasifikasi REAL (transfer learning).
+"""Prediksi severity kerusakan banjir sawah padi dengan model v2 (retrain).
 
-Model : SodaXII/efficientnet-b0_rice-leaf-disease-augmented-v4_fft
-        (fine-tune EfficientNet-B0 dari google/efficientnet-b0, 8 kelas daun padi,
-         akurasi evaluasi 91.28% pada dataset penulis).
-Format : ONNX (ai-service/model/model.onnx) dijalankan via onnxruntime.
-         Runtime TIDAK membutuhkan torch/transformers.
-
+Model : agriguard-v2 — EfficientNet-B0 (torchvision), 3 kelas severity banjir,
+        dilatih ulang dari dataset banjir sawah asli (jawaban atas evaluasi
+        penyisihan ICONFEST 2026: "model AI perlu dilatih ulang menggunakan
+        dataset spesifik banjir").
+Bukti : test class accuracy 0.9172 pada 145 sampel holdout banjir (baseline
+        majority-class 0.531), ONNX/PyTorch parity max|logit diff| 1.25e-06,
+        provenance lengkap di model_v2.metadata.json (manifest_sha256).
+Format : ONNX (ai-service/model/model_v2.onnx) dijalankan via onnxruntime.
+        Nama tensor I/O sengaja disamakan dengan v1 oleh export_onnx.py:
+        input "pixel_values" -> output "logits" (dibaca dinamis dari metadata).
+Prepro : identik dengan transform evaluasi training (common.py):
+        resize 224x224 BICUBIC, /255, normalize mean/std ImageNet.
+Runtime TIDAK membutuhkan torch/transformers.
 Kontrak output (WAJIB, tidak berubah):
-    {"status": "aman" | "rusak_ringan" | "rusak_berat",
-     "confidence": 0..1,
-     "damage_pct": 0..100}
-
+{"status": "aman" | "rusak_ringan" | "rusak_berat",
+ "confidence": 0..1,
+ "damage_pct": 0..100}
 Jika model gagal dimuat -> ModelLoadError (endpoint /predict mengembalikan 503).
 Jika foto ditolak gerbang domain/kualitas -> DomainGateError (endpoint /predict
 mengembalikan 422 + pesan ramah; lihat konstanta GERBANG DOMAIN di bawah).
 """
-
 import io
+import json
 import logging
 import os
 
@@ -30,15 +36,68 @@ logger = logging.getLogger("agriguard.ai")
 # Metadata model (transparansi — dipakai endpoint GET /model-info & laporan)
 # ---------------------------------------------------------------------------
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
-MODEL_PATH = os.path.join(MODEL_DIR, "model.onnx")
-MODEL_NAME = "SodaXII/efficientnet-b0_rice-leaf-disease-augmented-v4_fft"
-MODEL_ARCH = "EfficientNet-B0"
-MODEL_VERSION = "v4-fft (transformers 4.48.3, eval acc 0.9128)"
-MODEL_SOURCE = "https://huggingface.co/SodaXII/efficientnet-b0_rice-leaf-disease-augmented-v4_fft"
-MODEL_LICENSE = "Apache-2.0"
-EVAL_ACCURACY = 0.9128
+MODEL_PATH = os.path.join(MODEL_DIR, "model_v2.onnx")
+METADATA_PATH = os.path.join(MODEL_DIR, "model_v2.metadata.json")
 
+MODEL_NAME = "agriguard-v2/efficientnet-b0-severity-banjir-3kelas"
+MODEL_ARCH = "EfficientNet-B0 (torchvision, retrain dataset banjir sawah)"
+MODEL_VERSION = "v2-retrain (test class acc 0.9172, n=145 holdout banjir)"
+MODEL_SOURCE = (
+    "Retrain internal tim Duo Shinobi sebagai respons evaluasi penyisihan "
+    "ICONFEST 2026; dataset v2: AgriConnect Damage (Roboflow, CC-BY-4.0) + "
+    "Agrisense Flooded (Roboflow) — provenance lengkap di model_v2.metadata.json"
+)
+MODEL_LICENSE = "milik tim Duo Shinobi (data latih: CC-BY-4.0 / CC0)"
+# Angka evaluasi dari metrics.json one-shot-003 (holdout banjir, 145 sampel test).
+EVAL_ACCURACY = 0.9172
+EVAL_BASELINE_MAJORITY = 0.531
+EVAL_PER_CLASS = {
+    "tanpa_kerusakan_terlihat": 1.0,     # 61/61
+    "kerusakan_ringan_terlihat": 0.0,    # 0/7 — n sangat kecil; 5 dari 7 justru
+                                         # over-estimate ke berat (konservatif)
+    "kerusakan_berat_terlihat": 0.935,   # 72/77
+}
+EVAL_PARITY_MAX_LOGIT_DIFF = 1.2516975e-06
 CLASSES = ["aman", "rusak_ringan", "rusak_berat"]
+
+
+def _load_metadata() -> dict:
+    """Baca model_v2.metadata.json (provenance + nama tensor I/O).
+    Fallback kosong bila file hilang — konstanta default di bawah sudah
+    konsisten dengan checkpoint v2."""
+    try:
+        with open(METADATA_PATH, encoding="utf-8") as fh:
+            data = json.loads(fh.read())
+        if data.get("labels") and data.get("label_to_status"):
+            return data
+    except Exception:  # noqa: BLE001
+        pass
+    return {}
+
+
+_METADATA = _load_metadata()
+
+# ---------------------------------------------------------------------------
+# MAPPING_CONSTANTS — pemetaan label model v2 (3 kelas) -> 3 status AgriGuard
+# Urutan label WAJIB sama dengan urutan output logits (LABELS di common.py).
+# Diambil dari metadata; fallback hardcoded identik dengan repo training.
+# ---------------------------------------------------------------------------
+_DEFAULT_LABELS = [
+    "tanpa_kerusakan_terlihat",
+    "kerusakan_ringan_terlihat",
+    "kerusakan_berat_terlihat",
+]
+ID2LABEL = {
+    i: lbl for i, lbl in enumerate(_METADATA.get("labels", _DEFAULT_LABELS))
+}
+LABEL_TO_STATUS = _METADATA.get("label_to_status") or {
+    "tanpa_kerusakan_terlihat": "aman",
+    "kerusakan_ringan_terlihat": "rusak_ringan",
+    "kerusakan_berat_terlihat": "rusak_berat",
+}
+# Nama tensor I/O ONNX — dari metadata (export_onnx.py men-samakan dengan v1).
+INPUT_NAME = _METADATA.get("input_name", "pixel_values")
+OUTPUT_NAME = _METADATA.get("output_name", "logits")
 
 # ---------------------------------------------------------------------------
 # GERBANG DOMAIN (heuristik) — menolak foto yang jelas bukan lahan padi/tanaman
@@ -62,35 +121,6 @@ GREEN_HUE_MAX = 90.0
 GREEN_SAT_MIN = 0.20         # saturasi minimal (0..1)
 GREEN_VAL_MIN = 0.20         # value/kecerahan minimal (0..1)
 
-# ---------------------------------------------------------------------------
-# MAPPING_CONSTANTS — pemetaan 8 label model -> 3 kelas AgriGuard
-# ---------------------------------------------------------------------------
-# Dasar pemetaan (docs/severity):
-#   - Healthy                 -> aman          (tanaman sehat)
-#   - bercak/kerusakan ringan -> rusak_ringan  (lesi lokal, belum meluas)
-#   - penyakit merusak berat  -> rusak_berat   (blight/blast/hawar, kehilangan hasil besar)
-ID2LABEL = {
-    0: "Bacterial Leaf Blight",
-    1: "Brown Spot",
-    2: "Healthy Rice Leaf",
-    3: "Leaf Blast",
-    4: "Leaf scald",
-    5: "Narrow Brown Leaf Spot",
-    6: "Rice Hispa",
-    7: "Sheath Blight",
-}
-
-LABEL_TO_STATUS = {
-    "Healthy Rice Leaf": "aman",
-    "Brown Spot": "rusak_ringan",
-    "Narrow Brown Leaf Spot": "rusak_ringan",
-    "Leaf scald": "rusak_ringan",
-    "Leaf Blast": "rusak_berat",
-    "Bacterial Leaf Blight": "rusak_berat",
-    "Sheath Blight": "rusak_berat",
-    "Rice Hispa": "rusak_berat",
-}
-
 # damage_pct = estimasi deterministik dari confidence, per rentang status.
 #   aman         : 0..15   (semakin yakin sehat -> makin dekat 0)
 #   rusak_ringan : 30..60  diskalakan dari skor (spec)
@@ -103,12 +133,9 @@ DAMAGE_RANGE = {
 DAMAGE_MAX = 95
 
 # ---------------------------------------------------------------------------
-# Preprocessing — HARUS sama dengan HF EfficientNetImageProcessor.
-# Nilai mean/std di bawah divalidasi cocok persis (max|diff|=0.000000) dengan
-# output `transformers` EfficientNetImageProcessor pada gambar nyata.
-# (config preprocessor menyimpan image_std=0.4785.., tetapi transform efektif
-#  yang dipakai model = 0.229/0.224/0.225 — divalidasi via akurasi label:
-#  0.67 vs 0.50 pada 18 gambar berlabel Project-AgML.)
+# Preprocessing — HARUS sama dengan transform evaluasi training (common.py):
+# Resize 224x224 BICUBIC, ToTensor (/255), Normalize(mean/std ImageNet).
+# Identik dengan preprocessing v1, sehingga tidak ada perubahan di sini.
 # ---------------------------------------------------------------------------
 IMAGE_SIZE = 224
 RESCALE = 1.0 / 255.0
@@ -136,7 +163,9 @@ def load_model():
     if not os.path.exists(MODEL_PATH):
         raise ModelLoadError(f"File model tidak ditemukan: {MODEL_PATH}")
     try:
-        _SESSION = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
+        _SESSION = ort.InferenceSession(
+            MODEL_PATH, providers=["CPUExecutionProvider"]
+        )
     except Exception as exc:  # noqa: BLE001
         raise ModelLoadError(f"Gagal memuat model ONNX: {exc}") from exc
     return _SESSION
@@ -148,7 +177,7 @@ def is_model_loaded() -> bool:
 
 def get_model_info() -> dict:
     """Metadata untuk endpoint GET /model-info (transparansi/laporan)."""
-    return {
+    info = {
         "model": MODEL_NAME,
         "architecture": MODEL_ARCH,
         "version": MODEL_VERSION,
@@ -162,6 +191,17 @@ def get_model_info() -> dict:
         "mapping": LABEL_TO_STATUS,
         "damage_pct_range": {k: list(v) for k, v in DAMAGE_RANGE.items()},
         "eval_accuracy": EVAL_ACCURACY,
+        "evaluation": {
+            "test_class_accuracy": EVAL_ACCURACY,
+            "baseline_majority_class": EVAL_BASELINE_MAJORITY,
+            "test_samples": 145,
+            "per_class_recall": EVAL_PER_CLASS,
+            "onnx_parity_max_logit_diff": EVAL_PARITY_MAX_LOGIT_DIFF,
+            "scope": (
+                "Holdout adalah potret banjir/sawah yang dipisah per peristiwa "
+                "(group-aware); bukan test set penulis model v1."
+            ),
+        },
         "domain_gate": {
             "vegetation_min_ratio": VEGETATION_MIN_RATIO,
             "green_hue_range_pil_0_255": [GREEN_HUE_MIN, GREEN_HUE_MAX],
@@ -170,14 +210,35 @@ def get_model_info() -> dict:
             "confidence_min": CONFIDENCE_MIN,
         },
     }
+    if _METADATA:
+        provenance = {
+            k: _METADATA.get(k)
+            for k in (
+                "label_schema", "trained_on", "purpose", "ready_for_integration",
+                "checkpoint_sha256", "manifest_sha256", "split_id",
+                "metrics_sha256", "onnx_sha256",
+            )
+            if _METADATA.get(k) is not None
+        }
+        verification = _METADATA.get("export_verification")
+        if verification:
+            provenance["export_verification"] = {
+                "verified": verification.get("verified"),
+                "checked_at": verification.get("checked_at"),
+                "max_absolute_logit_difference":
+                    verification.get("max_absolute_logit_difference"),
+                "versions": verification.get("versions"),
+            }
+        info["provenance"] = provenance
+    return info
 
 
 def _preprocess(image_bytes: bytes) -> np.ndarray:
     with Image.open(io.BytesIO(image_bytes)) as im:
         im = im.convert("RGB").resize((IMAGE_SIZE, IMAGE_SIZE), PIL_RESAMPLE)
         arr = np.asarray(im, dtype=np.float32) * RESCALE
-    arr = (arr - IMAGE_MEAN) / IMAGE_STD
-    arr = np.transpose(arr, (2, 0, 1))  # HWC -> CHW
+        arr = (arr - IMAGE_MEAN) / IMAGE_STD
+        arr = np.transpose(arr, (2, 0, 1))  # HWC -> CHW
     return np.ascontiguousarray(arr[None, ...], dtype=np.float32)
 
 
@@ -188,7 +249,6 @@ def _softmax(x: np.ndarray) -> np.ndarray:
 
 def _green_ratio(image_bytes: bytes) -> float:
     """Rasio piksel hijau vegetasi (0..1) via ambang pada ruang HSV.
-
     Hue memakai skala PIL (0..255). Rentang hijau 35..90 setara ~49°..127°,
     mencakup hijau-kekuningan hingga hijau-cyan. Saturation & value minimal
     menyingkirkan area gelap/abu-abu yang secara hue bisa masuk rentang hijau.
@@ -196,16 +256,16 @@ def _green_ratio(image_bytes: bytes) -> float:
     with Image.open(io.BytesIO(image_bytes)) as im:
         rgb = im.convert("RGB").resize((IMAGE_SIZE, IMAGE_SIZE), PIL_RESAMPLE)
         hsv = rgb.convert("HSV")
-    arr = np.asarray(hsv, dtype=np.float32)
-    hue = arr[..., 0]  # 0..255 (skala PIL)
-    sat = arr[..., 1] / 255.0
-    val = arr[..., 2] / 255.0
-    green = (
-        (hue >= GREEN_HUE_MIN)
-        & (hue <= GREEN_HUE_MAX)
-        & (sat >= GREEN_SAT_MIN)
-        & (val >= GREEN_VAL_MIN)
-    )
+        arr = np.asarray(hsv, dtype=np.float32)
+        hue = arr[..., 0]  # 0..255 (skala PIL)
+        sat = arr[..., 1] / 255.0
+        val = arr[..., 2] / 255.0
+        green = (
+            (hue >= GREEN_HUE_MIN)
+            & (hue <= GREEN_HUE_MAX)
+            & (sat >= GREEN_SAT_MIN)
+            & (val >= GREEN_VAL_MIN)
+        )
     return float(green.mean())
 
 
@@ -221,15 +281,14 @@ def _damage_pct(status: str, confidence: float) -> int:
 def _infer(image_bytes: bytes) -> dict:
     session = load_model()
     x = _preprocess(image_bytes)
-    logits = session.run(["logits"], {"pixel_values": x})[0][0]
+    # Nama tensor I/O dibaca dari metadata (identik v1: pixel_values -> logits).
+    logits = session.run([OUTPUT_NAME], {INPUT_NAME: x})[0][0]
     probs = _softmax(np.asarray(logits, dtype=np.float32))
-
     idx = int(probs.argmax())
     label = ID2LABEL[idx]
     status = LABEL_TO_STATUS[label]
     confidence = round(float(probs[idx]), 4)
     damage_pct = _damage_pct(status, confidence)
-
     return {
         "status": status,
         "confidence": confidence,
@@ -239,7 +298,6 @@ def _infer(image_bytes: bytes) -> dict:
 
 def predict_image(image_bytes: bytes, filename: str = "") -> dict:
     """Validasi gambar, jalankan gerbang domain, lalu klasifikasi (kontrak tetap).
-
     Gerbang domain (sebelum inference): rasio piksel hijau vegetasi <
     VEGETATION_MIN_RATIO -> DomainGateError (foto bukan lahan tanaman).
     Gerbang kualitas (setelah inference): confidence < CONFIDENCE_MIN ->
@@ -283,5 +341,4 @@ def predict_image(image_bytes: bytes, filename: str = "") -> dict:
             "Kualitas foto tidak cukup jelas untuk dianalisis. "
             "Ambil foto lebih dekat & terang."
         )
-
     return result

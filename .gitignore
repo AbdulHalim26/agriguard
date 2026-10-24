@@ -56,6 +56,8 @@ ai-service/*.pyc
 ai-service/.venv/
 ai-service/training/__pycache__/
 ai-service/training/sources.local.json
+!ai-service/model/model_v2.onnx
+!ai-service/model/model_v2.metadata.json
 training-data/
 training-artifacts/
 .env
