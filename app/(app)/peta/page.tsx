@@ -13,14 +13,11 @@ import {
 } from 'lucide-react'
 import { getPetaData, type PetaData, type PetaLahan, type PetaReport } from './actions'
 import { AI_STATUS_INFO, formatConfidence, type AiStatus } from '@/lib/recommendations'
+import MapSkeleton from '@/components/map/MapSkeleton'
 
 const PetaMap = dynamic(() => import('./PetaMap'), {
   ssr: false,
-  loading: () => (
-    <div className="h-[70vh] flex items-center justify-center bg-gray-100 text-sm text-gray-400">
-      Memuat peta...
-    </div>
-  ),
+  loading: () => <MapSkeleton className="h-[70vh]" />,
 })
 
 function formatDateTime(value: string | null | undefined): string {

@@ -38,14 +38,11 @@ import { useCurrentUserId } from '@/lib/offline/use-current-user'
 import type { GeoCoords } from './ScanMap'
 import PhotoGuide from './PhotoGuide'
 import ScanTerbaru from './ScanTerbaru'
+import MapSkeleton from '@/components/map/MapSkeleton'
 
 const ScanMap = dynamic(() => import('./ScanMap'), {
   ssr: false,
-  loading: () => (
-    <div className="h-56 flex items-center justify-center bg-gray-100 text-sm text-gray-400">
-      Memuat peta...
-    </div>
-  ),
+  loading: () => <MapSkeleton className="h-56" />,
 })
 
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
