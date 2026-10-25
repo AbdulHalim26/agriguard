@@ -32,7 +32,7 @@ const HOW_STEPS = [
   {
     icon: Cpu,
     title: 'AI Menganalisis',
-    description: 'Model computer vision memeriksa foto dan mengukur tingkat kerusakan.',
+    description: 'Model AI memeriksa foto dan memperkirakan tingkat kerusakan.',
   },
   {
     icon: ClipboardList,
@@ -48,9 +48,9 @@ const HOW_STEPS = [
 
 const AI_STEPS = [
   { icon: Camera, title: 'Foto Lahan', description: 'Gambar padi atau sawah dari jarak jelas.' },
-  { icon: Cpu, title: 'YOLO / CNN', description: 'Model mendeteksi objek dan pola kerusakan.' },
-  { icon: ScanSearch, title: 'Deteksi Kerusakan', description: 'Menandai area daun yang bermasalah.' },
-  { icon: Gauge, title: 'Skor Kerusakan', description: 'Menghitung persentase tingkat kerusakan.' },
+  { icon: Cpu, title: 'EfficientNet-B0', description: 'Model AI menganalisis pola visual pada foto.' },
+  { icon: ScanSearch, title: 'Klasifikasi Kerusakan', description: 'Kondisi dibagi menjadi aman, rusak ringan, atau rusak berat.' },
+  { icon: Gauge, title: 'Estimasi Kerusakan', description: 'Skor perkiraan kerusakan berdasarkan hasil klasifikasi.' },
   { icon: Lightbulb, title: 'Rekomendasi', description: 'Saran tindakan yang bisa langsung dilakukan.' },
 ]
 
