@@ -74,7 +74,7 @@ class AreaMetrics(Contract):
 
 class SeverityReview(Contract):
     review_required: Literal[True] = True
-    reason: Literal["UNCALIBRATED_BOX_COVERAGE", "NO_DETECTIONS_NOT_HEALTHY"]
+    reason: Literal["UNCALIBRATED_BOX_COVERAGE", "NO_DETECTIONS_NOT_HEALTHY", "UNSUPPORTED_NON_RICE_IMAGE"]
     calibration_id: None = None
     area_metrics: AreaMetrics
 
@@ -108,7 +108,7 @@ class DetectionResponse(Contract):
     image_width: int = Field(strict=True, ge=1, le=16384)
     image_height: int = Field(strict=True, ge=1, le=16384)
     detections: list[Detection] = Field(max_length=300)
-    inference_status: Literal["SUCCESS", "NO_DETECTIONS"]
+    inference_status: Literal["SUCCESS", "NO_DETECTIONS", "UNSUPPORTED_IMAGE"]
     severity_status: Literal["REVIEW_REQUIRED"] = "REVIEW_REQUIRED"
     status: None = None
     confidence: None = None
@@ -118,6 +118,12 @@ class DetectionResponse(Contract):
 
     @model_validator(mode="after")
     def coherent_response(self):
+        if self.inference_status == "UNSUPPORTED_IMAGE":
+            if self.detections:
+                raise ValueError("Unsupported images must never include detections")
+            if self.severity.reason != "UNSUPPORTED_NON_RICE_IMAGE":
+                raise ValueError("Unsupported image requires UNSUPPORTED_NON_RICE_IMAGE severity reason")
+            return self
         if bool(self.detections) != (self.inference_status == "SUCCESS"):
             raise ValueError("Detection status does not match results")
         schema_names = LABEL_SCHEMAS[self.provenance.label_schema]

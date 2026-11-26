@@ -71,9 +71,9 @@ class YoloV8nRiceV1IntegrationTest(unittest.TestCase):
         detector = YoloDetector(MODEL_PATH, confidence=0.25, iou=0.45)
 
         blank_resp = detector.detect(make_blank_png())
-        self.assertEqual(blank_resp.inference_status, "NO_DETECTIONS")
+        self.assertEqual(blank_resp.inference_status, "UNSUPPORTED_IMAGE")
         self.assertEqual(blank_resp.detections, [])
-        self.assertEqual(blank_resp.severity.reason, "NO_DETECTIONS_NOT_HEALTHY")
+        self.assertEqual(blank_resp.severity.reason, "UNSUPPORTED_NON_RICE_IMAGE")
         self.assertIsNone(blank_resp.status)
         self.assertIsNone(blank_resp.damage_pct)
 
@@ -140,6 +140,64 @@ class YoloV8nRiceV1IntegrationTest(unittest.TestCase):
                 self.assertIn("v2", str(js_info))
 
         asyncio.run(run())
+
+    def test_non_rice_safety_gate_and_crop_recall(self):
+        import math
+        from PIL import ImageDraw
+        from pydantic import ValidationError
+        from detection.contracts import DetectionResponse
+
+        detector = YoloDetector(MODEL_PATH, confidence=0.25, iou=0.45)
+
+        def to_jpg(im: Image.Image) -> bytes:
+            b = io.BytesIO()
+            im.convert("RGB").save(b, format="JPEG", quality=90)
+            return b.getvalue()
+
+        # Negative set: fan grill, indoor wall, document, solid green wall, blue curtain
+        fan = Image.new("RGB", (640, 480), (215, 218, 222))
+        dr = ImageDraw.Draw(fan)
+        for r in range(30, 190, 16):
+            dr.ellipse((320 - r, 240 - r, 320 + r, 240 + r), outline=(95, 100, 108), width=3)
+        for a in range(0, 360, 15):
+            rad = math.radians(a)
+            dr.line((320, 240, 320 + int(185 * math.cos(rad)), 240 + int(185 * math.sin(rad))), fill=(85, 90, 96), width=2)
+
+        solid_green = Image.new("RGB", (640, 480), (70, 155, 85))
+        blue_curtain = Image.new("RGB", (640, 480), (90, 145, 215))
+
+        negatives = [
+            ("fan", to_jpg(fan)),
+            ("solid_green_wall", to_jpg(solid_green)),
+            ("blue_curtain", to_jpg(blue_curtain)),
+        ]
+        repo_root = Path(__file__).resolve().parents[2]
+        logo_path = repo_root / "public" / "logo.png"
+        if logo_path.is_file():
+            negatives.append(("logo.png", to_jpg(Image.open(logo_path))))
+
+        for name, img_bytes in negatives:
+            resp = detector.detect(img_bytes)
+            self.assertEqual(resp.inference_status, "UNSUPPORTED_IMAGE", f"Expected UNSUPPORTED_IMAGE for {name}")
+            self.assertEqual(resp.detections, [], f"Expected zero boxes for {name}")
+            self.assertEqual(resp.severity.reason, "UNSUPPORTED_NON_RICE_IMAGE")
+
+        # Positive repo samples (healthy, mild, severe) must pass domain gate
+        samples_dir = Path(__file__).resolve().parent / "samples"
+        for sample_name in ("sample_aman.jpg", "sample_rusak_ringan.jpg", "sample_rusak_berat.jpg"):
+            sample_path = samples_dir / sample_name
+            if sample_path.is_file():
+                resp = detector.detect(sample_path.read_bytes())
+                self.assertIn(resp.inference_status, ("SUCCESS", "NO_DETECTIONS"), f"Unexpected reject for {sample_name}")
+
+        # Contract forbids UNSUPPORTED_IMAGE with non-empty detections
+        sample_resp = detector.detect(to_jpg(fan)).model_dump()
+        sample_resp["detections"] = [{
+            "class_id": 5, "class_name": "Rice-Blast", "annotation_level": "lesion",
+            "confidence": 0.26, "bbox_xyxy": [10.0, 10.0, 50.0, 50.0],
+        }]
+        with self.assertRaises(ValidationError):
+            DetectionResponse.model_validate(sample_resp)
 
 
 if __name__ == "__main__":

@@ -101,3 +101,51 @@ test('DetectionBoxLayer and DetectionPanel render 9-class boxes, Healthy note, a
   const emptyHtml = renderToStaticMarkup(React.createElement(DetectionPanel, { result: emptyParsed, loading: false, error: null }))
   assert.match(emptyHtml, /Tidak ada objek terdeteksi/)
 })
+
+test('PHASE 2.0R.3: UNSUPPORTED_IMAGE contract, classifier suppression, and mobile height-capped overlay', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { resolve } = await import('node:path')
+  const unsupportedBase = {
+    ...sample9ClassResponse([]),
+    inference_status: 'UNSUPPORTED_IMAGE' as const,
+    severity: {
+      ...sample9ClassResponse([]).severity,
+      reason: 'UNSUPPORTED_NON_RICE_IMAGE' as const,
+    },
+  }
+  const parsedUnsupported = detectionResponseSchema.parse(unsupportedBase)
+  assert.equal(parsedUnsupported.inference_status, 'UNSUPPORTED_IMAGE')
+  assert.equal(parsedUnsupported.detections.length, 0)
+
+  // UNSUPPORTED_IMAGE with any detection box must fail contract validation
+  assert.throws(() => detectionResponseSchema.parse({
+    ...unsupportedBase,
+    detections: [
+      { class_id: 5, class_name: 'Rice-Blast', annotation_level: 'lesion', confidence: 0.26, bbox_xyxy: [10, 10, 100, 100] },
+    ],
+  }))
+
+  // DetectionPanel renders UNSUPPORTED_IMAGE warning without disease labels
+  const unsupportedHtml = renderToStaticMarkup(
+    React.createElement(DetectionPanel, { result: parsedUnsupported, loading: false, error: null })
+  )
+  assert.match(unsupportedHtml, /UNSUPPORTED_IMAGE/)
+  assert.doesNotMatch(unsupportedHtml, /Rice-Blast/)
+
+  // Even if YOLO returned a box, suppressedByClassifier (classifier HTTP 422) suppresses disease labels
+  const positiveParsed = detectionResponseSchema.parse(sample9ClassResponse([
+    { class_id: 5, class_name: 'Rice-Blast', annotation_level: 'lesion', confidence: 0.26, bbox_xyxy: [15, 15, 180, 180] },
+  ]))
+  const suppressedHtml = renderToStaticMarkup(
+    React.createElement(DetectionPanel, { result: positiveParsed, loading: false, error: null, suppressedByClassifier: true })
+  )
+  assert.match(suppressedHtml, /UNSUPPORTED_IMAGE/)
+  assert.doesNotMatch(suppressedHtml, /Rice-Blast/)
+
+  // Mobile scanner layout checks: height-capped aspect-ratio overlay, collapsible SHA-256 details, safe area
+  const overlaySrc = readFileSync(resolve(process.cwd(), 'components/features/DetectionOverlay.tsx'), 'utf8')
+  const scanSrc = readFileSync(resolve(process.cwd(), 'app/(app)/scan/page.tsx'), 'utf8')
+  assert.match(overlaySrc, /min\(42vh, 280px\)/)
+  assert.match(scanSrc, /Detail bukti foto &amp; SHA-256/)
+  assert.match(scanSrc, /safe-area-inset-bottom/)
+})

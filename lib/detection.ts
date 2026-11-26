@@ -76,13 +76,13 @@ export const detectionResponseSchema = z.object({
   image_width: z.number().int().min(1).max(16384),
   image_height: z.number().int().min(1).max(16384),
   detections: z.array(objectDetectionSchema).max(300),
-  inference_status: z.enum(['SUCCESS', 'NO_DETECTIONS']),
+  inference_status: z.enum(['SUCCESS', 'NO_DETECTIONS', 'UNSUPPORTED_IMAGE']),
   severity_status: z.literal('REVIEW_REQUIRED'),
   // Existing names remain explicit NULL until an expert-calibrated policy exists.
   status: z.null(), confidence: z.null(), damage_pct: z.null(),
   severity: z.object({
     review_required: z.literal(true),
-    reason: z.enum(['UNCALIBRATED_BOX_COVERAGE', 'NO_DETECTIONS_NOT_HEALTHY']),
+    reason: z.enum(['UNCALIBRATED_BOX_COVERAGE', 'NO_DETECTIONS_NOT_HEALTHY', 'UNSUPPORTED_NON_RICE_IMAGE']),
     calibration_id: z.null(),
     area_metrics: z.object({
       lesion_box_union_px: finite.min(0), leaf_box_union_px: finite.min(0),
@@ -106,10 +106,16 @@ export const detectionResponseSchema = z.object({
     inference_ms: finite.min(0), persistence: z.literal('preview_only'),
   }).strict(),
 }).strict().superRefine((response, ctx) => {
-  const nonempty = response.detections.length > 0
-  if (nonempty !== (response.inference_status === 'SUCCESS') || response.severity.reason !==
-      (nonempty ? 'UNCALIBRATED_BOX_COVERAGE' : 'NO_DETECTIONS_NOT_HEALTHY')) {
-    ctx.addIssue({ code: 'custom', message: 'Inconsistent detection/review status' })
+  if (response.inference_status === 'UNSUPPORTED_IMAGE') {
+    if (response.detections.length > 0 || response.severity.reason !== 'UNSUPPORTED_NON_RICE_IMAGE') {
+      ctx.addIssue({ code: 'custom', message: 'Unsupported image must have empty detections and UNSUPPORTED_NON_RICE_IMAGE reason' })
+    }
+  } else {
+    const nonempty = response.detections.length > 0
+    if (nonempty !== (response.inference_status === 'SUCCESS') || response.severity.reason !==
+        (nonempty ? 'UNCALIBRATED_BOX_COVERAGE' : 'NO_DETECTIONS_NOT_HEALTHY')) {
+      ctx.addIssue({ code: 'custom', message: 'Inconsistent detection/review status' })
+    }
   }
   const schemaClasses: readonly string[] = response.provenance.label_schema === 'rice_v1_9class'
     ? RICE_V1_9CLASS_NAMES

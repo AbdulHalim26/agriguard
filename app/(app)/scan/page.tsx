@@ -181,7 +181,11 @@ export default function ScanPage() {
       }
       const parsed = detectionResponseSchema.parse(body)
       setDetectionResult(parsed)
-      setPreviewTab('yolo')
+      if (parsed.inference_status !== 'UNSUPPORTED_IMAGE') {
+        setPreviewTab('yolo')
+      } else {
+        setPreviewTab('watermarked')
+      }
     }).catch(() => {
       if (active) setDetectionError(controller.signal.aborted
         ? 'Deteksi melewati 90 detik. Foto tetap tersedia; klasifikasi foto diproses terpisah.'
@@ -669,8 +673,11 @@ export default function ScanPage() {
     }
   }, [successId, router])
 
+  const isUnsupportedImage = aiRetake || detectionResult?.inference_status === 'UNSUPPORTED_IMAGE'
+  const canShowYoloOverlay = Boolean(detectionResult && !isUnsupportedImage)
+
   return (
-    <div className="max-w-5xl mx-auto grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+    <div className="max-w-5xl mx-auto grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] items-start pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="space-y-6 min-w-0">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Scan Kerusakan Padi</h1>
@@ -725,11 +732,11 @@ export default function ScanPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {detectionResult && previewTab === 'yolo' ? <DetectionOverlay imageSrc={photo.previewUrl} result={detectionResult} /> : <img
+            {canShowYoloOverlay && previewTab === 'yolo' ? <DetectionOverlay imageSrc={photo.previewUrl} result={detectionResult!} /> : <img
               src={previewTab === 'watermarked' && watermarked ? watermarked.previewUrl : photo.previewUrl}
               alt={previewTab === 'watermarked' && watermarked ? 'Salinan foto dengan watermark GPS' : 'Foto asli tanpa perubahan'}
               decoding="async"
-              className="w-full h-72 object-contain bg-slate-950"
+              className="w-full max-h-[42vh] sm:max-h-72 h-auto object-contain bg-slate-950"
             />}
             {/* Bracket sudut viewport kamera */}
             <span className="pointer-events-none absolute inset-3" aria-hidden="true">
@@ -778,13 +785,13 @@ export default function ScanPage() {
                   {locationStatusLabel(locationStatus, photo.captureSource)}
                 </span>
               </div>
-              {(watermarked || detectionResult) && (
+              {(watermarked || canShowYoloOverlay) && (
                 <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-                  {detectionResult && (
+                  {canShowYoloOverlay && (
                     <button
                       type="button"
                       onClick={() => startTransition(() => setPreviewTab('yolo'))}
-                      className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'yolo' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium ${previewTab === 'yolo' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
                     >
                       Deteksi YOLO
                     </button>
@@ -793,7 +800,7 @@ export default function ScanPage() {
                     <button
                       type="button"
                       onClick={() => startTransition(() => setPreviewTab('watermarked'))}
-                      className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'watermarked' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium ${previewTab === 'watermarked' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
                     >
                       Salinan Watermark
                     </button>
@@ -801,28 +808,36 @@ export default function ScanPage() {
                   <button
                     type="button"
                     onClick={() => startTransition(() => setPreviewTab('original'))}
-                    className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'original' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
+                    className={`px-2.5 py-1.5 rounded-md text-xs font-medium ${previewTab === 'original' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
                   >
                     Foto Asli
                   </button>
                 </div>
               )}
             </div>
-            <div className="grid sm:grid-cols-2 gap-1 text-[11px] text-slate-600 font-mono">
-              <p>{photo.captureSource === 'gallery_upload' ? 'Waktu pilih file (perangkat)' : 'Waktu foto (perangkat)'}: {formatWibTimestamp(photo.deviceCapturedAt)}</p>
-              <p>{photo.captureSource === 'gallery_upload' ? 'Akurasi GPS saat unggah' : 'Akurasi GPS'}: {gpsSnapshot?.accuracy_m != null ? `±${Math.round(gpsSnapshot.accuracy_m)} m` : 'Tidak tersedia'}</p>
-              <p>SHA-256 Asli: {photo.originalSha256.slice(0, 16)}…</p>
-              <p>SHA-256 Watermark: {watermarked ? `${watermarked.sha256.slice(0, 16)}…` : 'Menyiapkan…'}</p>
-            </div>
             {photo.captureSource === 'gallery_upload' && (
-              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
                 {GALLERY_LOCATION_WARNING}
               </p>
             )}
-            <p className="text-[11px] text-slate-500">{PHOTO_EVIDENCE_DISCLAIMER}</p>
+            <details className="text-xs text-slate-600">
+              <summary className="cursor-pointer py-1 font-medium text-slate-700 select-none">
+                Detail bukti foto &amp; SHA-256
+              </summary>
+              <div className="mt-1.5 space-y-1.5 pt-1.5 border-t border-slate-200/80">
+                <div className="grid sm:grid-cols-2 gap-1 text-[11px] text-slate-600 font-mono">
+                  <p>{photo.captureSource === 'gallery_upload' ? 'Waktu pilih file (perangkat)' : 'Waktu foto (perangkat)'}: {formatWibTimestamp(photo.deviceCapturedAt)}</p>
+                  <p>{photo.captureSource === 'gallery_upload' ? 'Akurasi GPS saat unggah' : 'Akurasi GPS'}: {gpsSnapshot?.accuracy_m != null ? `±${Math.round(gpsSnapshot.accuracy_m)} m` : 'Tidak tersedia'}</p>
+                  <p>SHA-256 Asli: {photo.originalSha256.slice(0, 16)}…</p>
+                  <p>SHA-256 Watermark: {watermarked ? `${watermarked.sha256.slice(0, 16)}…` : 'Menyiapkan…'}</p>
+                </div>
+                <p className="text-[11px] text-slate-500">{PHOTO_EVIDENCE_DISCLAIMER}</p>
+              </div>
+            </details>
           </div>
 
           {yoloEnabled && <DetectionPanel result={detectionResult} loading={detectionLoading}
+            suppressedByClassifier={aiRetake}
             error={offline ? 'Sedang offline. Deteksi objek memerlukan koneksi; foto tetap dapat dilaporkan melalui antrean existing.' : detectionError} />}
 
           {analyzing && (
@@ -847,7 +862,7 @@ export default function ScanPage() {
                   <button
                     type="button"
                     onClick={() => setManualMode(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors shrink-0"
                   >
                     <FileWarning size={14} aria-hidden="true" />
                     Gunakan Laporan Manual

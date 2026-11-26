@@ -19,6 +19,7 @@ import onnxruntime as ort
 from PIL import Image, ImageOps
 
 from .contracts import Detection, DetectionResponse, ModelSpec, Provenance
+from .domain_gate import evaluate_crop_domain
 from .severity import review_severity
 
 
@@ -180,10 +181,30 @@ class YoloDetector:
         except Exception as exc:
             raise DetectorUnavailable("Model/manifest ONNX tidak kompatibel; gunakan workflow ekspor AgriGuard.") from exc
         self.confidence, self.iou = confidence, iou
+        self._apply_domain_gate = not allow_synthetic
 
     def detect(self, image_bytes: bytes) -> DetectionResponse:
         tensor, transform = preprocess(image_bytes, self.spec.input_size)
         started = time.perf_counter()
+        if self._apply_domain_gate:
+            domain = evaluate_crop_domain(image_bytes)
+            if not domain.supported:
+                return DetectionResponse(
+                    model_version=self.spec.model_version, model_family=self.spec.model_family,
+                    image_width=transform.width, image_height=transform.height, detections=[],
+                    inference_status="UNSUPPORTED_IMAGE",
+                    severity=review_severity([], transform.width, transform.height, unsupported_image=True),
+                    provenance=Provenance(
+                        label_schema=self.spec.label_schema,
+                        model_sha256=self.spec.model_sha256, image_sha256=hashlib.sha256(image_bytes).hexdigest(),
+                        dataset_manifest_sha256=self.spec.dataset_manifest_sha256,
+                        output_format=self.spec.output_format,
+                        postprocessing="nms_free" if self.spec.output_format == "end2end_xyxy" else "class_aware_nms",
+                        confidence_threshold=self.confidence,
+                        iou_threshold=self.iou if self.spec.output_format == "raw_cxcywh_bcn" else None,
+                        inference_ms=(time.perf_counter() - started) * 1000,
+                    ),
+                )
         try:
             values = self.session.run([self.spec.output_name], {self.spec.input_name: tensor})
             if len(values) != 1:

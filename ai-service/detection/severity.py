@@ -29,9 +29,22 @@ class SeverityEngine(Protocol):
     def __call__(self, detections: Sequence[Detection], width: int, height: int) -> SeverityReview: ...
 
 
-def review_severity(detections: Sequence[Detection], width: int, height: int) -> SeverityReview:
+def review_severity(
+    detections: Sequence[Detection], width: int, height: int, *, unsupported_image: bool = False
+) -> SeverityReview:
     if width <= 0 or height <= 0:
         raise ValueError("Positive image dimensions required")
+    if unsupported_image:
+        return SeverityReview(
+            reason="UNSUPPORTED_NON_RICE_IMAGE",
+            area_metrics=AreaMetrics(
+                lesion_box_union_px=0.0,
+                leaf_box_union_px=0.0,
+                lesion_leaf_box_intersection_px=0.0,
+                lesion_image_box_coverage_ratio=0.0,
+                lesion_leaf_box_coverage_ratio=None,
+            ),
+        )
     # Healthy is never counted as lesion damage coverage.
     lesions = [d.bbox_xyxy for d in detections if d.annotation_level == "lesion" and d.class_name != "Healthy"]
     leaves = [d.bbox_xyxy for d in detections if d.annotation_level == "leaf"]
