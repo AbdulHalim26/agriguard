@@ -1,0 +1,27 @@
+-- Synthetic ONLY; loaded before the candidate, in the runner's fresh cluster.
+insert into public.poktan(id,name,invite_code) values
+ ('00000000-0000-4000-8000-000000000101','Geometry synthetic A','POC-A'),
+ ('00000000-0000-4000-8000-000000000102','Geometry synthetic B','POC-B');
+insert into auth.users(id,phone,phone_confirmed_at) values
+ ('00000000-0000-4000-8000-000000000001','6280000000001',now()),
+ ('00000000-0000-4000-8000-000000000002','6280000000002',now()),
+ ('00000000-0000-4000-8000-000000000003','6280000000003',now()),
+ ('00000000-0000-4000-8000-000000000004','6280000000004',now()),
+ ('00000000-0000-4000-8000-000000000005','6280000000005',now());
+update public.profiles set poktan_id='00000000-0000-4000-8000-000000000101'
+ where id in ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004');
+update public.profiles set poktan_id='00000000-0000-4000-8000-000000000102'
+ where id='00000000-0000-4000-8000-000000000003';
+update public.profiles set role='ppl' where id='00000000-0000-4000-8000-000000000004';
+update public.profiles set role='dinas' where id='00000000-0000-4000-8000-000000000005';
+insert into public.lahan(id,owner_id,poktan_id,name,area_hectares,polygon) values
+ ('00000000-0000-4000-8000-000000000201','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000101','Synthetic A',0.75,'[[107.285,-6.312],[107.286,-6.312],[107.286,-6.313],[107.285,-6.313]]'),
+ ('00000000-0000-4000-8000-000000000202','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000101','Synthetic B',0.75,'[[107.285,-6.312],[107.286,-6.312],[107.286,-6.313],[107.285,-6.313]]'),
+ ('00000000-0000-4000-8000-000000000203','00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000102','Synthetic C',0.75,'[[107.285,-6.312],[107.286,-6.312],[107.286,-6.313],[107.285,-6.313]]');
+insert into public.ai_analyses(id,user_id,photo_hash,status,confidence,damage_pct) values
+ ('00000000-0000-4000-8000-000000000401','00000000-0000-4000-8000-000000000001',repeat('a',64),'rusak_berat',0.82,89);
+insert into public.damage_reports(id,user_id,lahan_id,photo_paths,photo_hash,latitude,longitude,client_created_at,server_created_at,idempotency_key,
+ evidence_source,ai_status,ai_confidence,ai_damage_pct,is_verified) values
+ ('00000000-0000-4000-8000-000000000801','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000201',
+ array['original/private/legacy.jpg'],repeat('a',64),-6.3125,107.2855,'2020-01-01T00:00:00Z','2020-01-02T00:00:00Z',
+ '00000000-0000-4000-8000-000000000701','legacy_unverified','rusak_berat',0.7,84,true);

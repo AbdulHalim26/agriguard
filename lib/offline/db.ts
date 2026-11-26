@@ -1,4 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import type { SyncFailure } from './sync-core'
+import type { ClientCaptureMetadata } from '@/lib/reports/photo-evidence'
 
 export interface OfflineReport {
   id: string
@@ -10,12 +12,19 @@ export interface OfflineReport {
   aiStatus: 'aman' | 'rusak_ringan' | 'rusak_berat' | null
   aiConfidence: number | null
   aiDamagePct: number | null
+  evidenceSource?: 'manual' | 'ai' | 'pending'
+  analysisId?: string
   latitude: number
   longitude: number
   clientCreatedAt: string
   photoBlobs: Blob[]
+  captureMetadata?: ClientCaptureMetadata | null
   synced: boolean
   retryCount: number
+  syncState?: 'retryable' | 'needs_attention' | 'synced'
+  lastSyncError?: string
+  lastSyncStatus?: number
+  syncedReportId?: string
 }
 
 // Catatan desain: event sederhana agar widget "Menunggu Sync (n)" di dashboard
@@ -74,47 +83,52 @@ export async function getOfflineDB(): Promise<IDBPDatabase<OfflineDBSchema>> {
 
 export async function saveReportOffline(report: OfflineReport): Promise<void> {
   const db = await getOfflineDB()
-  await db.put('reports', report)
+  const tx = db.transaction('reports', 'readwrite')
+  const existing = await tx.store.get(report.id)
+  if (existing && existing.userId !== report.userId) {
+    await tx.done
+    throw new Error('ID laporan dimiliki akun lain. Antrean sebelumnya tetap disimpan.')
+  }
+  if (existing?.synced) { await tx.done; return }
+  await tx.store.put(report)
+  await tx.done
   notifyQueueChanged()
 }
 
 export async function getPendingReports(userId: string): Promise<OfflineReport[]> {
   const db = await getOfflineDB()
   const allReports = await db.getAllFromIndex('reports', 'by-user', userId)
-  return allReports.filter((r) => !r.synced)
+  return allReports.filter((r) => r.userId === userId && !r.synced)
 }
 
-// Catatan desain: tidak pakai getAllFromIndex('by-synced', false) karena kunci
-// boolean di IndexedDB tidak cocok dengan primitif 0/1; scan seluruh store lalu
-// filter di JS (volume queue kecil, aman untuk aplikasi demo).
-export async function getAllPendingReports(): Promise<OfflineReport[]> {
+// Keep blobs as recovery evidence, but remove acknowledged items from pending.
+export async function markReportSynced(reportId: string, userId: string, serverId: string): Promise<void> {
   const db = await getOfflineDB()
-  const all = await db.getAll('reports')
-  return all.filter((r) => !r.synced)
-}
-
-export async function markReportSynced(reportId: string): Promise<void> {
-  const db = await getOfflineDB()
-  const report = await db.get('reports', reportId)
-  if (report) {
+  const tx = db.transaction('reports', 'readwrite')
+  const report = await tx.store.get(reportId)
+  if (report?.userId === userId) {
     report.synced = true
-    await db.put('reports', report)
-    notifyQueueChanged()
+    report.syncState = 'synced'
+    report.syncedReportId = serverId
+    delete report.lastSyncError
+    await tx.store.put(report)
   }
+  await tx.done
+  notifyQueueChanged()
 }
 
-export async function incrementRetryCount(reportId: string): Promise<void> {
+export async function recordSyncFailure(reportId: string, userId: string, failure: SyncFailure): Promise<void> {
   const db = await getOfflineDB()
-  const report = await db.get('reports', reportId)
-  if (report) {
-    report.retryCount += 1
-    await db.put('reports', report)
+  const tx = db.transaction('reports', 'readwrite')
+  const report = await tx.store.get(reportId)
+  if (report?.userId === userId && !report.synced) {
+    report.retryCount = (report.retryCount || 0) + 1
+    report.syncState = failure.retryable ? 'retryable' : 'needs_attention'
+    report.lastSyncError = failure.message
+    report.lastSyncStatus = failure.status
+    await tx.store.put(report)
   }
-}
-
-export async function deleteReport(reportId: string): Promise<void> {
-  const db = await getOfflineDB()
-  await db.delete('reports', reportId)
+  await tx.done
   notifyQueueChanged()
 }
 
@@ -122,12 +136,4 @@ export async function getReportCount(userId: string): Promise<number> {
   const db = await getOfflineDB()
   const reports = await db.getAllFromIndex('reports', 'by-user', userId)
   return reports.filter((r) => !r.synced).length
-}
-
-// Jumlah seluruh item tertunda (semua user/device) — dipakai AutoSync untuk
-// menentukan apakah retry berkala perlu dijalankan (hemat saat antrian kosong).
-export async function getPendingCount(): Promise<number> {
-  const db = await getOfflineDB()
-  const all = await db.getAll('reports')
-  return all.filter((r) => !r.synced).length
 }

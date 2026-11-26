@@ -5,30 +5,20 @@ import { MapContainer, TileLayer, Polygon, Marker, Tooltip, LayersControl, useMa
 import * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PetaLahan, PetaReport } from './actions'
-import { AI_STATUS_INFO, type AiStatus } from '@/lib/recommendations'
+import type { AiStatus } from '@/lib/recommendations'
+import { reportAdvisory } from '@/lib/reports/advisory'
+import { validatePolygon } from '@/lib/land/geometry'
 import LocateControl from '@/components/map/LocateControl'
 
 const PIN_COLORS: Record<string, string> = {
-  aman: '#16a34a',
+  aman: '#0284c7',
   rusak_ringan: '#d97706',
   rusak_berat: '#dc2626',
   manual: '#6b7280',
 }
 
-// Polygon lahan: null = belum ada laporan -> hijau brand tipis
-const POLYGON_COLORS: Record<string, string> = {
-  aman: '#16a34a',
-  rusak_ringan: '#ED6C02',
-  rusak_berat: '#D32F2F',
-  none: '#2E7D32',
-}
-
 function pinColorFor(status: AiStatus | null): string {
   return status ? PIN_COLORS[status] : PIN_COLORS.manual
-}
-
-function polygonColorFor(status: AiStatus | null): string {
-  return status ? POLYGON_COLORS[status] : POLYGON_COLORS.none
 }
 
 function renderPinColor(status: AiStatus | null) {
@@ -93,6 +83,10 @@ export default function PetaMap({
 }) {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [map, setMap] = useState<Leaflet.Map | null>(null)
+  const renderableLand = useMemo(() => lahan.flatMap((field) => {
+    const validation = validatePolygon(field.polygon)
+    return validation.valid ? [{ ...field, polygon: validation.original_ring }] : []
+  }), [lahan])
 
   // Status AI terbaru per lahan (reports sudah urut server_created_at desc)
   const latestStatusByLahan = useMemo(() => {
@@ -110,6 +104,7 @@ export default function PetaMap({
 
   return (
     <div className="relative">
+      {renderableLand.length < lahan.length && <p className="text-xs text-slate-700 p-3" role="status">{lahan.length - renderableLand.length} batas tersimpan belum dapat digambar dengan aman. Record/koordinat asli tetap dipertahankan untuk pemeriksaan.</p>}
       <MapContainer
         center={[-6.312, 107.285]}
         zoom={14}
@@ -132,11 +127,12 @@ export default function PetaMap({
           </LayersControl.BaseLayer>
         </LayersControl>
         <MapInstanceCapture onReady={setMap} />
-        <FitBounds lahan={lahan} />
+        <FitBounds lahan={renderableLand} />
 
-        {lahan.map((l) => {
+        {renderableLand.map((l) => {
           const status = latestStatusByLahan.get(l.id) ?? null
-          const color = polygonColorFor(status)
+          // A point photo/classification never paints the entire parcel as damaged.
+          const color = '#64748b'
           return (
             <Polygon
               key={l.id}
@@ -145,7 +141,7 @@ export default function PetaMap({
               eventHandlers={{ click: () => onSelectLahan(l, status) }}
             >
               <Tooltip>
-                {l.name} · {status ? AI_STATUS_INFO[status].label : 'Belum ada laporan'}
+                {l.name} · Batas lahan terdaftar · Luas terdampak belum terverifikasi
               </Tooltip>
             </Polygon>
           )
@@ -159,7 +155,7 @@ export default function PetaMap({
             eventHandlers={{ click: () => onSelectReport(r) }}
           >
             <Tooltip>
-              {r.lahan_name || 'Lahan'} · {r.ai_status ? AI_STATUS_INFO[r.ai_status].label : 'Manual'}
+              {r.lahan_name || 'Lahan'} · {reportAdvisory(r).title}: {reportAdvisory(r).visual_label} · Perlu Verifikasi
             </Tooltip>
           </Marker>
         ))}

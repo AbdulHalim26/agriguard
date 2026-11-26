@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:security": "node --import ./tests/register.mjs --test tests/*.test.ts",
+    "land:inventory": "node --import ./tests/register.mjs scripts/land-geometry-inventory.ts",
     "audit:prod": "npm audit --omit=dev",
     "ai:dev": "ai-service/.venv/bin/uvicorn main:app --app-dir ai-service --host 0.0.0.0 --port 8000"
   },
@@ -28,6 +30,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "geographiclib-geodesic": "2.2.0",
     "idb": "^8.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.417.0",

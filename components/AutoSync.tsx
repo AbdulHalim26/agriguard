@@ -3,7 +3,8 @@
 import { useEffect } from 'react'
 import { autoSync, registerSyncHandler } from '@/lib/offline/sync'
 import { isOfflineNow, subscribeOffline, installFetchOnlineDetector } from '@/lib/offline/status'
-import { getPendingCount } from '@/lib/offline/db'
+import { getReportCount } from '@/lib/offline/db'
+import { useCurrentUserId } from '@/lib/offline/use-current-user'
 
 // Retry ringan berkala — hanya dijalankan bila antrian masih berisi item.
 const RETRY_INTERVAL_MS = 30_000
@@ -13,7 +14,9 @@ const RETRY_INTERVAL_MS = 30_000
 // sekarang berhasil), saat tab kembali terlihat, saat jendela fokus, dan
 // retry berkala 30 detik selama masih ada item di antrian (FR-03).
 export default function AutoSync() {
+  const userId = useCurrentUserId()
   useEffect(() => {
+    if (!userId) return
     // Setiap fetch yang sukses menandai koneksi pulih (memicu flush via
     // subscribeOffline di bawah), sehingga sync jalan tanpa perlu refresh.
     installFetchOnlineDetector()
@@ -50,9 +53,11 @@ export default function AutoSync() {
 
     // Retry ringan: cek antrian dulu, sync hanya bila ada item pending.
     const interval = window.setInterval(async () => {
-      if (isOfflineNow()) return
+      // Probe recovery while the browser has connectivity, even when an earlier
+      // failed request set forcedOffline. The session endpoint remains authoritative.
+      if (!navigator.onLine) return
       try {
-        const pending = await getPendingCount()
+        const pending = await getReportCount(userId)
         if (pending > 0) {
           autoSync()
         }
@@ -68,7 +73,7 @@ export default function AutoSync() {
       document.removeEventListener('visibilitychange', onVisible)
       window.clearInterval(interval)
     }
-  }, [])
+  }, [userId])
 
   return null
 }

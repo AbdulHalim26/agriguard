@@ -10,6 +10,7 @@ import {
   type NotifType,
 } from '@/lib/notifications'
 import { useCurrentUserId } from '@/lib/offline/use-current-user'
+import { formatWib } from '@/lib/ews/data'
 
 const TYPE_STYLE: Record<NotifType, { icon: typeof Bell; wrap: string; color: string; label: string }> = {
   peringatan: { icon: AlertTriangle, wrap: 'bg-amber-100', color: 'text-[#ED6C02]', label: 'Peringatan' },
@@ -33,7 +34,7 @@ function NotifRow({ n }: { n: NotifItem }) {
           </span>
         </div>
         <p className="text-sm text-gray-600 mt-0.5">{n.description}</p>
-        <p className="text-xs text-gray-400 mt-1.5">{formatRelativeTime(n.time)}</p>
+        <p className="text-xs text-gray-500 mt-1.5">{n.timeLabel ? `${n.timeLabel}: ${formatWib(n.time)}` : formatRelativeTime(n.time)}</p>
       </div>
     </li>
   )
@@ -53,7 +54,7 @@ function EmptyState() {
 
 export default function NotifikasiPage() {
   const userId = useCurrentUserId()
-  const { items, loading } = useNotifications(userId)
+  const { items, loading, reload } = useNotifications(userId)
 
   const tabs = useMemo(
     () => [
@@ -70,6 +71,9 @@ export default function NotifikasiPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Notifikasi</h1>
         <p className="text-gray-500 mt-1">Peringatan dan pembaruan aktivitas Anda</p>
+        <button type="button" onClick={reload} disabled={loading} className="mt-3 min-h-[48px] px-4 py-2 border rounded-lg text-sm inline-flex gap-2 items-center disabled:opacity-50">
+          <RefreshCw size={16} aria-hidden="true" />Perbarui Notifikasi dan EWS
+        </button>
       </div>
 
       <Tabs defaultValue="semua">

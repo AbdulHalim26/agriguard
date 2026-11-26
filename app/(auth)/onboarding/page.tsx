@@ -38,45 +38,13 @@ export default function OnboardingPage() {
         return
       }
 
-      const { data: poktan, error: poktanError } = await supabase
-        .from('poktan')
-        .select('id')
-        .eq('invite_code', inviteCode.trim().toUpperCase())
-        .single()
-
-      if (poktanError || !poktan) {
-        setError('Kode undangan tidak valid')
-        setLoading(false)
-        return
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName.trim(),
-          poktan_id: poktan.id,
-        })
-        .eq('id', user.id)
+      const { error: profileError } = await supabase.rpc('complete_onboarding', {
+        p_full_name: fullName.trim(),
+        p_invite_code: inviteCode.trim().toUpperCase(),
+      })
 
       if (profileError) {
         throw profileError
-      }
-
-      // Update mock session cookie with new full_name
-      if (typeof window !== 'undefined') {
-        const sessionStr = localStorage.getItem('agriguard-mock-session')
-        if (sessionStr) {
-          try {
-            const session = JSON.parse(sessionStr)
-            session.user.user_metadata.full_name = fullName.trim()
-            session.user.user_metadata.poktan_id = poktan.id
-            const updatedSession = JSON.stringify(session)
-            localStorage.setItem('agriguard-mock-session', updatedSession)
-            document.cookie = `agriguard-mock-session=${encodeURIComponent(updatedSession)}; path=/; max-age=3600; SameSite=Lax`
-          } catch {
-            // ignore parse errors
-          }
-        }
       }
 
       router.push('/dashboard')

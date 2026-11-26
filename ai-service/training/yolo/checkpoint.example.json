@@ -1,0 +1,13 @@
+{
+  "approved": false,
+  "reviewed_by": "",
+  "model_family": "yolo26n",
+  "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt",
+  "release_tag": "v8.4.0",
+  "license": "AGPL-3.0",
+  "license_url": "https://www.ultralytics.com/license",
+  "license_verified": false,
+  "evidence": [],
+  "upstream_sha256": null,
+  "notes": "Inactive template. Manually obtain official detection weights only after approval, save source/license evidence, and verify origin/digest. COCO-pretrained weights are NOT an AgriGuard disease-trained model."
+}

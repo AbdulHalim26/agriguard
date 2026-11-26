@@ -1,0 +1,14 @@
+# TEMPLATE ONLY. prepare_dataset.py generates an actual YAML from reviewed boxes.
+# All six classes are disabled in classes.example.json until data is reviewed.
+# Never point this template at classification-only folders or enable downloads.
+path: /absolute/path/to/prepared-rice-detection
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: leaf_blast
+  1: bacterial_leaf_blight
+  2: brown_spot
+  3: sheath_blight
+  4: tungro_symptom
+  5: leaf_folder_damage

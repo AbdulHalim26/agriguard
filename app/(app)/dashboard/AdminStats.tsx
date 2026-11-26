@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { FileStack, Clock3, CheckCircle2 } from 'lucide-react'
 import { getReportStats, type ReportStats } from '@/app/(app)/verifikasi/verification-actions'
+import { INSURANCE_NOTICE } from '@/lib/reports/advisory'
 
 export default function AdminStats() {
   const [stats, setStats] = useState<ReportStats | null>(null)
@@ -70,6 +71,7 @@ export default function AdminStats() {
           </div>
         ))}
       </div>
+      <p className="text-xs text-slate-600 mt-3">{INSURANCE_NOTICE}</p>
     </div>
   )
 }

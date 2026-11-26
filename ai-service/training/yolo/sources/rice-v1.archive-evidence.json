@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "evidence_basis": "Owner-provided verified facts in PHASE 1B.0.3; ZIP was not re-downloaded or extracted by this tool",
+  "zip_sha256": "f63259c3acac0ec059edc42ad478e1a4b29e6c69f3304b00f2cb3f6dd0c1543a",
+  "zip_integrity": "PASS_REPORTED_BY_OWNER",
+  "zip_file_count": 2217,
+  "zip_image_count": 1107,
+  "readme_declared_image_count": 1143,
+  "discrepancy_status": "UNRESOLVED_UPSTREAM_METADATA_DISCREPANCY",
+  "extraction_failure": false,
+  "license_approved": false,
+  "annotations_approved": false,
+  "conversion_approved": false
+}

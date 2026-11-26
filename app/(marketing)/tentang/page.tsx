@@ -113,8 +113,8 @@ export default function TentangPage() {
             </div>
             <h3 className={`text-lg font-semibold mb-2 ${NAVY}`}>PPL &amp; Dinas</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Verifikasi laporan, beri catatan, dan pantau rekap luas terdampak per wilayah untuk
-              respons yang lebih cepat.
+              Verifikasi laporan, beri catatan, dan pantau rekap laporan serta luas terdaftar unik.
+              Luas terdampak memerlukan bukti pengukuran terpisah; klaim tetap diputuskan penanggung.
             </p>
           </div>
         </div>

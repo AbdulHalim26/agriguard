@@ -20,9 +20,14 @@ import {
   XCircle,
 } from 'lucide-react'
 import { listMyReports, type ReportItem } from './actions'
-import { AI_STATUS_INFO, formatConfidence, type AiStatus } from '@/lib/recommendations'
+import { AI_STATUS_INFO } from '@/lib/recommendations'
+import { evidenceLabel } from '@/lib/reports/evidence'
 import { getReportCount, subscribeQueue } from '@/lib/offline/db'
 import { useCurrentUserId } from '@/lib/offline/use-current-user'
+import AdvisoryAssessment from '@/components/features/AdvisoryAssessment'
+import RegisteredAreaSummary from '@/components/features/RegisteredAreaSummary'
+import { INSURANCE_NOTICE, isAiStatus, reportAdvisory, UNKNOWN_AFFECTED_AREA_LABEL } from '@/lib/reports/advisory'
+import { formatHectares, uniqueRegisteredArea } from '@/lib/reports/area'
 
 const PAGE_SIZE = 10
 
@@ -59,14 +64,14 @@ function StatusBadge({ report }: { report: ReportItem }) {
   if (state === 'tervalidasi') {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-        <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Tervalidasi
+        <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Laporan Terverifikasi
       </span>
     )
   }
   if (state === 'ditolak') {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-        <XCircle className="w-3 h-3" aria-hidden="true" /> Ditolak
+        <XCircle className="w-3 h-3" aria-hidden="true" /> Laporan Ditolak
       </span>
     )
   }
@@ -167,7 +172,7 @@ export default function LaporanClient() {
     const q = search.trim().toLowerCase()
     return reports.filter((r) => {
       if (q) {
-        const hay = `${r.lahan?.name || ''} ${r.lahan?.id || ''} ${r.district || ''}`.toLowerCase()
+        const hay = `${r.lahan?.name || ''} ${r.lahan_id || r.lahan?.id || ''} ${r.district || ''}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       if (status !== 'semua' && reportState(r) !== status) return false
@@ -185,7 +190,7 @@ export default function LaporanClient() {
     { label: 'Total Laporan', value: stats.total, icon: FileText, wrap: 'bg-blue-100', color: 'text-[#0288D1]' },
     { label: 'Menunggu', value: stats.menunggu, icon: Clock, wrap: 'bg-amber-100', color: 'text-[#ED6C02]' },
     { label: 'Terverifikasi', value: stats.tervalidasi, icon: CheckCircle2, wrap: 'bg-green-100', color: 'text-[#2E7D32]' },
-    { label: 'Perlu Tindakan', value: stats.perluTindakan, icon: AlertTriangle, wrap: 'bg-red-100', color: 'text-[#D32F2F]' },
+    { label: 'Indikasi Berat pada Laporan', value: stats.perluTindakan, icon: AlertTriangle, wrap: 'bg-red-100', color: 'text-[#D32F2F]' },
   ]
 
   return (
@@ -293,6 +298,9 @@ export default function LaporanClient() {
       </div>
 
       {/* Tabel */}
+      {!loading && !error && <RegisteredAreaSummary summary={uniqueRegisteredArea(filtered.map((r) => ({
+        parcel_id: r.lahan_id ?? r.lahan?.id, registered_area_hectares: r.lahan?.area_hectares,
+      })), 'laporan saya yang dimuat dan lolos filter aktif, sebelum pembagian halaman')} />}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-6 space-y-3">
@@ -321,34 +329,23 @@ export default function LaporanClient() {
                     <th className="px-4 py-3 font-semibold">Tanggal</th>
                     <th className="px-4 py-3 font-semibold">ID Lahan</th>
                     <th className="px-4 py-3 font-semibold">Kecamatan</th>
-                    <th className="px-4 py-3 font-semibold">Hasil AI</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Penilaian Awal</th>
+                    <th className="px-4 py-3 font-semibold">Verifikasi Laporan</th>
                     <th className="px-4 py-3 font-semibold text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pageRows.map((r) => {
-                    const info = r.ai_status ? AI_STATUS_INFO[r.ai_status as AiStatus] : null
                     return (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(r.server_created_at)}</td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-900 truncate max-w-[160px]">{r.lahan?.name || '—'}</p>
-                          <p className="text-xs text-gray-400 font-mono">#{r.lahan?.id?.slice(0, 8) || '—'}</p>
+                          <p className="text-xs text-gray-400 font-mono">#{(r.lahan_id ?? r.lahan?.id)?.slice(0, 8) || '—'}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-600">{r.district || '—'}</td>
                         <td className="px-4 py-3">
-                          {info ? (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${info.badgeClass}`}>
-                              {info.label}
-                              {r.ai_confidence != null && ` · ${formatConfidence(r.ai_confidence)}`}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                              <Clock className="w-3 h-3" aria-hidden="true" />
-                              Menunggu Analisis AI
-                            </span>
-                          )}
+                          <AdvisoryAssessment assessment={reportAdvisory(r)} compact />
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge report={r} />
@@ -432,25 +429,11 @@ export default function LaporanClient() {
                 )}
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500 mb-1">Hasil AI</p>
-                    {selected.ai_status ? (
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${AI_STATUS_INFO[selected.ai_status as AiStatus].badgeClass}`}>
-                        {AI_STATUS_INFO[selected.ai_status as AiStatus].label}
-                        {selected.ai_confidence != null && ` · ${formatConfidence(selected.ai_confidence)}`}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                        <Clock className="w-3 h-3" aria-hidden="true" />
-                        Menunggu Analisis AI
-                      </span>
-                    )}
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500 mb-1">Kerusakan</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {selected.ai_damage_pct != null ? `${Math.round(selected.ai_damage_pct)}%` : '—'}
-                    </p>
+                  <div className="col-span-2"><AdvisoryAssessment assessment={reportAdvisory(selected)} technical /></div>
+                  <div className="col-span-2 bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500 mb-1">Luas Terdaftar Lahan</p>
+                    <p className="text-sm font-semibold text-gray-900">{formatHectares(selected.lahan?.area_hectares ?? null)}</p>
+                    <p className="text-xs text-slate-600 mt-1">{UNKNOWN_AFFECTED_AREA_LABEL}.</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500 mb-1">Kecamatan</p>
@@ -469,9 +452,11 @@ export default function LaporanClient() {
 
                 <div className="border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-gray-700">Status Verifikasi</p>
+                    <p className="text-sm font-medium text-gray-700">Verifikasi Laporan oleh PPL/Dinas</p>
                     <StatusBadge report={selected} />
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">Sumber: {evidenceLabel(selected.evidence_source)}</p>
+                  <p className="text-xs text-slate-600 mt-2">{INSURANCE_NOTICE}</p>
                   {selected.verification_note && (
                     <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2">
                       {selected.verification_note}
@@ -479,13 +464,13 @@ export default function LaporanClient() {
                   )}
                 </div>
 
-                {selected.ai_status && (
+                {isAiStatus(selected.ai_status) && (
                   <div className="mt-4 p-3 bg-green-50 border border-green-100 rounded-xl">
                     <p className="text-xs font-semibold text-[#2E7D32] mb-1 flex items-center gap-1.5">
                       <AlertCircle size={14} aria-hidden="true" /> Rekomendasi
                     </p>
                     <p className="text-xs text-green-800">
-                      {AI_STATUS_INFO[selected.ai_status as AiStatus].recommendation}
+                      {AI_STATUS_INFO[selected.ai_status].recommendation}
                     </p>
                   </div>
                 )}

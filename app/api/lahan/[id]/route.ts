@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { z } from 'zod'
-
-const updateSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  area_hectares: z.number().positive().max(1000).optional(),
-})
+import { writeLahan } from '@/lib/land/server'
 
 export async function DELETE(
   request: NextRequest,
@@ -50,46 +45,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
-  const { id } = await params
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
+  try {
+    let body: unknown
+    try { body = await request.json() }
+    catch { return NextResponse.json({ error: 'JSON perubahan lahan tidak valid.', code: 'INVALID_JSON' }, { status: 400 }) }
+    const result = await writeLahan(body, await createClient(), { id: (await params).id })
+    return NextResponse.json(result, { status: result.status, headers: { 'Cache-Control': 'no-store' } })
+  } catch {
+    return NextResponse.json({ error: 'Layanan lahan belum tersedia.', code: 'LAND_SERVICE_UNAVAILABLE' }, { status: 503 })
   }
-
-  const { data: existing } = await supabase
-    .from('lahan')
-    .select('owner_id')
-    .eq('id', id)
-    .single()
-
-  if (!existing) {
-    return NextResponse.json({ error: 'Lahan tidak ditemukan' }, { status: 404 })
-  }
-
-  if (existing.owner_id !== user.id) {
-    return NextResponse.json({ error: 'Tidak berhak mengubah lahan ini' }, { status: 403 })
-  }
-
-  const body = await request.json()
-  const parsed = updateSchema.safeParse(body)
-
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
-  }
-
-  const { data, error } = await supabase
-    .from('lahan')
-    .update(parsed.data)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('[PATCH /api/lahan/:id] gagal:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ data })
 }

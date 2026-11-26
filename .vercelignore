@@ -1,3 +1,10 @@
 ai-service/
 .render/
 *.md
+*.pdf
+.staging/
+.env
+.env*.local
+supabase/.temp/
+supabase/poc/
+video_arsip/

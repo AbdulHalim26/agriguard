@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "project_ref": "zlluhylmykoymynnjxjs",
+  "name": "agriguard-staging",
+  "region": "ap-southeast-1",
+  "status_at_verification": "ACTIVE_HEALTHY",
+  "postgres_major": 17,
+  "database_version_at_verification": "17.12.0.000",
+  "production_project_ref": "gvrwzfwybvyqlvbqxebe",
+  "identity_source": "Supabase Management projects/list metadata, verified 2026-11-24",
+  "platform_defaults_reported_by_owner": {
+    "automatic_api_grants": false,
+    "automatic_rls": true,
+    "migration_history_empty": true
+  },
+  "baseline_q01_q08_owner_observed_2026_11_25": {
+    "q01_identity": "PASS",
+    "q02_inventory": "PASS",
+    "q03_history": "SKIPPED_NOT_INITIALIZED",
+    "q04_default_privileges": "SECURITY_FINDING_BROAD_DEFAULTS_PG17",
+    "q05_rls": "PASS_INITIAL_POSTURE",
+    "q06_storage": "PASS_ZERO_BUCKETS",
+    "q07_empty_counts": "PASS_ZERO_USERS_AND_OBJECTS",
+    "q08_conflicts": "PASS_ZERO_CONFLICTS"
+  },
+  "remote_catalog_verified": true,
+  "migration_or_seed_approval": false
+}

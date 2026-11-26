@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Trash2, Edit2, MapPin, Calculator, RotateCcw } from 'lucide-react'
 import { LahanWithPolygon } from './actions'
+import { assessLandGeometry, declaredArea } from '@/lib/land/geometry'
+import LandGeometrySummary from '@/components/features/LandGeometrySummary'
 
 function formatDateOnly(value: string): string {
   const d = new Date(value)
@@ -51,17 +53,6 @@ export default function LahanList({ initialData = [] }: LahanListProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
     }
-  }
-
-  const calculateArea = (polygon: number[][]): number => {
-    if (polygon.length < 3) return 0
-    let area = 0
-    for (let i = 0; i < polygon.length; i++) {
-      const j = (i + 1) % polygon.length
-      area += polygon[i][0] * polygon[j][1]
-      area -= polygon[j][0] * polygon[i][1]
-    }
-    return Math.abs(area) / 2 * 111000 * 111000 / 10000
   }
 
   if (loading) {
@@ -137,13 +128,14 @@ export default function LahanList({ initialData = [] }: LahanListProps) {
               <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                 <span className="flex items-center gap-1">
                   <Calculator size={14} />
-                  {item.area_hectares.toFixed(2)} Ha
+                  Luas deklarasi: {typeof item.area_hectares === 'number' && Number.isFinite(item.area_hectares) ? item.area_hectares.toLocaleString('id-ID') : 'belum tersedia'} ha
                 </span>
                 <span className="flex items-center gap-1">
                   <MapPin size={14} />
-                  {item.polygon.length} titik
+                  {Array.isArray(item.polygon) ? item.polygon.length : '—'} posisi
                 </span>
               </div>
+              <LandGeometrySummary assessment={assessLandGeometry(item.polygon, item.area_hectares)} />
               <div className="text-xs text-gray-400">
                 Dibuat: {item.created_at ? formatDateOnly(item.created_at) : '—'}
               </div>
@@ -170,7 +162,7 @@ interface LahanEditFormProps {
 
 function LahanEditForm({ lahan, onClose, onSave }: LahanEditFormProps) {
   const [name, setName] = useState(lahan.name)
-  const [area, setArea] = useState(lahan.area_hectares.toString())
+  const [area, setArea] = useState(lahan.area_hectares == null ? '' : String(lahan.area_hectares))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -179,8 +171,8 @@ function LahanEditForm({ lahan, onClose, onSave }: LahanEditFormProps) {
       setError('Nama lahan wajib diisi')
       return
     }
-    if (!area || parseFloat(area) <= 0) {
-      setError('Luas harus lebih dari 0')
+    if (declaredArea(area) === null) {
+      setError('Luas deklarasi harus angka lebih dari 0 dan maksimal 1000 ha.')
       return
     }
 
@@ -221,11 +213,12 @@ function LahanEditForm({ lahan, onClose, onSave }: LahanEditFormProps) {
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Luas (Hektar)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Luas deklarasi (ha), bukan hasil hitung otomatis</label>
         <input
           type="number"
-          step="0.01"
-          min="0.01"
+          step="any"
+          min="0"
+          max="1000"
           value={area}
           onChange={e => setArea(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"

@@ -19,8 +19,10 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { listMyLahan } from '@/app/(app)/lahan/actions'
 import { getReportCount, subscribeQueue } from '@/lib/offline/db'
-import { syncReports, isOnline } from '@/lib/offline/sync'
+import { syncReports, isOnline, cancelSync } from '@/lib/offline/sync'
+import { rememberOfflineUser } from '@/lib/offline/identity'
 import { updateFullName } from './actions'
+import { formatHectares, uniqueRegisteredArea } from '@/lib/reports/area'
 
 interface ProfileData {
   full_name: string
@@ -63,8 +65,8 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('')
   const [district, setDistrict] = useState('')
   const [poktanName, setPoktanName] = useState('')
-  const [totalHa, setTotalHa] = useState(0)
-  const [lahanCount, setLahanCount] = useState(0)
+  const [totalHa, setTotalHa] = useState<number | null>(null)
+  const [lahanCount, setLahanCount] = useState<number | null>(null)
 
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -114,11 +116,12 @@ export default function SettingsPage() {
       try {
         const res = await listMyLahan()
         if (!cancelled && res.data) {
-          setLahanCount(res.data.length)
-          setTotalHa(res.data.reduce((s, l) => s + (Number(l.area_hectares) || 0), 0))
+          const summary = uniqueRegisteredArea(res.data.map((field) => ({ parcel_id: field.id, registered_area_hectares: field.area_hectares })), 'lahan saya yang dimuat')
+          setLahanCount(summary.unique_parcel_count)
+          setTotalHa(summary.hectares)
         }
       } catch {
-        // offline -> biarkan 0
+        // Unknown stays unknown; failure is not zero registered area.
       }
     }
     load()
@@ -199,10 +202,10 @@ export default function SettingsPage() {
     if (!isOnline()) {
       setSyncMsg('Sedang offline — laporan tetap tersimpan di perangkat ini.')
     } else {
-      const result = await syncReports()
+      const result = await syncReports({ retryBlocked: true })
       if (result.syncedCount > 0) setSyncMsg(`Berhasil menyinkronkan ${result.syncedCount} laporan.`)
       else if (result.skippedCount > 0) setSyncMsg(result.errors[0] || 'Sebagian laporan dilewati.')
-      else if (result.failedCount > 0) setSyncMsg(result.errors[0] || 'Beberapa laporan gagal disinkronkan.')
+      else if (result.failedCount > 0 || !result.success) setSyncMsg(result.errors[0] || 'Beberapa laporan belum disinkronkan; data tetap disimpan.')
       else setSyncMsg('Tidak ada laporan yang perlu disinkronkan.')
     }
     try {
@@ -214,8 +217,11 @@ export default function SettingsPage() {
   }
 
   const handleLogout = async () => {
+    cancelSync()
+    rememberOfflineUser(null)
     const supabase = createClient()
-    await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) { window.alert('Logout belum berhasil. Periksa koneksi dan coba lagi.'); return }
     window.location.href = '/login'
   }
 
@@ -318,10 +324,10 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <dt className="flex items-center gap-2 text-sm text-gray-600">
-              <Ruler size={16} className="text-[#2E7D32]" aria-hidden="true" /> Total Luas
+              <Ruler size={16} className="text-[#2E7D32]" aria-hidden="true" /> Luas Terdaftar Unik (Termuat)
             </dt>
             <dd className="text-sm font-medium text-gray-900">
-              {totalHa.toFixed(1)} Ha ({lahanCount} lahan)
+              {formatHectares(totalHa)} ({lahanCount ?? '—'} ID lahan)
             </dd>
           </div>
           <div className="flex items-center justify-between">

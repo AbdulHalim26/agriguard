@@ -1,21 +1,11 @@
+import { classifyPointInPolygon } from '@/lib/land/geometry'
+
 export type Point = [number, number]
 export type Polygon = Point[]
 
 export function pointInPolygon(point: Point, polygon: Polygon): boolean {
-  const [x, y] = point
-  let inside = false
-
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [xi, yi] = polygon[i]
-    const [xj, yj] = polygon[j]
-
-    const intersect =
-      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-
-    if (intersect) inside = !inside
-  }
-
-  return inside
+  const position = classifyPointInPolygon(point, polygon)
+  return position === 'INSIDE' || position === 'BOUNDARY'
 }
 
 export function validateGeofence(
@@ -97,7 +87,7 @@ export async function fileToBase64(file: File): Promise<string> {
   return arrayBufferToBase64(buffer)
 }
 
-export async function calculateSha256(file: File): Promise<string> {
+export async function calculateSha256(file: Blob): Promise<string> {
   const buffer = await file.arrayBuffer()
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))

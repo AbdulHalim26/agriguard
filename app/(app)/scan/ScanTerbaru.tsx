@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { History, ChevronRight, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { listMyReports, type ReportItem } from '@/app/(app)/laporan/actions'
-import { AI_STATUS_INFO, formatConfidence, type AiStatus } from '@/lib/recommendations'
+import AdvisoryAssessment from '@/components/features/AdvisoryAssessment'
+import { reportAdvisory } from '@/lib/reports/advisory'
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
@@ -89,13 +90,12 @@ export default function ScanTerbaru() {
               <tr className="text-left text-xs uppercase tracking-wide text-gray-400">
                 <th className="px-5 py-2 font-semibold">Tanggal</th>
                 <th className="px-5 py-2 font-semibold">Lahan</th>
-                <th className="px-5 py-2 font-semibold">Hasil AI</th>
-                <th className="px-5 py-2 font-semibold">Status</th>
+                    <th className="px-5 py-2 font-semibold">Penilaian Awal</th>
+                    <th className="px-5 py-2 font-semibold">Verifikasi Laporan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {rows.map((r) => {
-                const info = r.ai_status ? AI_STATUS_INFO[r.ai_status as AiStatus] : null
                 return (
                   <tr key={r.id}>
                     <td className="px-5 py-3 text-gray-600 whitespace-nowrap">{formatDate(r.server_created_at)}</td>
@@ -103,14 +103,7 @@ export default function ScanTerbaru() {
                       {r.lahan?.name || '—'}
                     </td>
                     <td className="px-5 py-3">
-                      {info ? (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${info.badgeClass}`}>
-                          {info.label}
-                          {r.ai_confidence != null && ` · ${formatConfidence(r.ai_confidence)}`}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-500">Manual</span>
-                      )}
+                      <AdvisoryAssessment assessment={reportAdvisory(r)} compact />
                     </td>
                     <td className="px-5 py-3">
                       <StatusCell r={r} />

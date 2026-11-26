@@ -1,225 +1,78 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Sprout, CheckCircle2, AlertTriangle, AlertCircle, ChevronRight } from 'lucide-react'
+import { Sprout, AlertTriangle, AlertCircle, ChevronRight, Image } from 'lucide-react'
 import { listMyLahan, type LahanWithPolygon } from '@/app/(app)/lahan/actions'
-import { listMyReports, type ReportItem, type AiStatus } from '@/app/(app)/laporan/actions'
-import { AI_STATUS_INFO } from '@/lib/recommendations'
-
-interface LahanCondition {
-  id: string
-  name: string
-  area: number
-  status: AiStatus | null
-  damagePct: number | null
-  health: number
-}
-
-function healthFromReport(status: AiStatus | null, damagePct: number | null): number {
-  if (!status) return 100
-  if (damagePct != null) return Math.max(0, Math.round(100 - damagePct))
-  if (status === 'aman') return 100
-  if (status === 'rusak_ringan') return 50
-  return 20
-}
-
-function barClass(status: AiStatus | null): string {
-  if (status === 'rusak_berat') return 'bg-[#D32F2F]'
-  if (status === 'rusak_ringan') return 'bg-[#ED6C02]'
-  if (status === 'aman') return 'bg-[#2E7D32]'
-  return 'bg-gray-300'
-}
+import { listMyReports, type ReportItem } from '@/app/(app)/laporan/actions'
+import { formatHectares, registeredArea, uniqueRegisteredArea } from '@/lib/reports/area'
+import { reportAdvisory, UNKNOWN_AFFECTED_AREA_LABEL } from '@/lib/reports/advisory'
+import AdvisoryAssessment from '@/components/features/AdvisoryAssessment'
 
 export default function LahanSummary({ userId }: { userId: string }) {
   const [lahan, setLahan] = useState<LahanWithPolygon[]>([])
-  const [conditions, setConditions] = useState<LahanCondition[]>([])
+  const [reports, setReports] = useState<ReportItem[]>([])
   const [loading, setLoading] = useState(true)
-
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
+    setLoading(true); setLahan([]); setReports([]); setError(null)
     const load = async () => {
-      if (!userId) return
       try {
-        const [lahanRes, reportRes] = await Promise.all([listMyLahan(), listMyReports()])
+        const [fields, evidence] = await Promise.all([listMyLahan(userId), listMyReports()])
         if (cancelled) return
-        const lahanRows = lahanRes.data || []
-        const reports: ReportItem[] = reportRes.data || []
-
-        // Laporan terbaru per lahan (reports sudah urut server_created_at desc)
-        const latest = new Map<string, ReportItem>()
-        for (const r of reports) {
-          const lid = r.lahan?.id
-          if (lid && !latest.has(lid)) latest.set(lid, r)
-        }
-
-        const conds: LahanCondition[] = lahanRows.map((l) => {
-          const rep = latest.get(l.id) || null
-          const status = rep?.ai_status ?? null
-          const damagePct = rep?.ai_damage_pct ?? null
-          return {
-            id: l.id,
-            name: l.name,
-            area: Number(l.area_hectares),
-            status,
-            damagePct,
-            health: healthFromReport(status, damagePct),
-          }
-        })
-
-        setLahan(lahanRows)
-        setConditions(conds)
+        if (fields.error || evidence.error) throw new Error('Ringkasan lahan/laporan belum dapat dimuat. Kondisi belum dapat disimpulkan.')
+        setLahan(fields.data || []); setReports(evidence.data || [])
       } catch {
-        if (!cancelled) {
-          setLahan([])
-          setConditions([])
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+        if (!cancelled) setError('Ringkasan lahan/laporan belum dapat dimuat. Kondisi belum dapat disimpulkan.')
+      } finally { if (!cancelled) setLoading(false) }
     }
-    load()
-    return () => {
-      cancelled = true
-    }
+    if (userId) void load()
+    else setLoading(false)
+    return () => { cancelled = true }
   }, [userId])
 
-  const totalHa = conditions.reduce((sum, c) => sum + (isNaN(c.area) ? 0 : c.area), 0)
-  const amanCount = conditions.filter((c) => c.status === 'aman').length
-  const ringanCount = conditions.filter((c) => c.status === 'rusak_ringan').length
-  const beratCount = conditions.filter((c) => c.status === 'rusak_berat').length
-
+  const conditions = useMemo(() => {
+    const latest = new Map<string, ReportItem>()
+    for (const report of reports) {
+      const id = report.lahan_id ?? report.lahan?.id
+      if (id && !latest.has(id)) latest.set(id, report)
+    }
+    return lahan.map((field) => ({ ...field, report: latest.get(field.id) ?? null }))
+  }, [lahan, reports])
+  const area = uniqueRegisteredArea(lahan.map((field) => ({ parcel_id: field.id, registered_area_hectares: field.area_hectares })), 'lahan saya yang berhasil dimuat')
   const cards = [
-    {
-      label: 'Lahan Saya',
-      value: `${totalHa.toFixed(1)} Ha`,
-      sub: `${conditions.length} bidang`,
-      icon: Sprout,
-      iconBg: 'bg-green-100',
-      iconColor: 'text-[#2E7D32]',
-      valueColor: 'text-gray-900',
-    },
-    {
-      label: 'Lahan Aman',
-      value: String(amanCount),
-      sub: 'bidang',
-      icon: CheckCircle2,
-      iconBg: 'bg-green-100',
-      iconColor: 'text-[#2E7D32]',
-      valueColor: 'text-[#2E7D32]',
-    },
-    {
-      label: 'Perlu Perhatian',
-      value: String(ringanCount),
-      sub: 'bidang',
-      icon: AlertTriangle,
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-[#ED6C02]',
-      valueColor: 'text-[#ED6C02]',
-    },
-    {
-      label: 'Rusak Berat',
-      value: String(beratCount),
-      sub: 'bidang',
-      icon: AlertCircle,
-      iconBg: 'bg-red-100',
-      iconColor: 'text-[#D32F2F]',
-      valueColor: 'text-[#D32F2F]',
-    },
+    { label: 'Luas Terdaftar Unik', value: formatHectares(area.hectares), sub: `${area.unique_parcel_count} ID lahan`, icon: Sprout },
+    { label: 'Tidak Tampak Kerusakan pada Foto', value: String(conditions.filter((c) => c.report?.ai_status === 'aman').length), sub: 'laporan terbaru per bidang, bukan jaminan sehat', icon: Image },
+    { label: 'Indikasi Ringan pada Laporan', value: String(conditions.filter((c) => c.report?.ai_status === 'rusak_ringan').length), sub: 'penilaian awal perlu verifikasi', icon: AlertTriangle },
+    { label: 'Indikasi Berat pada Laporan', value: String(conditions.filter((c) => c.report?.ai_status === 'rusak_berat').length), sub: 'penilaian awal perlu verifikasi', icon: AlertCircle },
   ]
-
-  return (
-    <div className="space-y-6">
-      {/* 4 kartu ringkasan lahan */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-            <div className={`w-10 h-10 rounded-xl ${c.iconBg} flex items-center justify-center mb-3`}>
-              <c.icon size={20} className={c.iconColor} aria-hidden="true" />
-            </div>
-            <p className={`text-2xl font-bold ${c.valueColor}`}>
-              {loading ? '—' : c.value}
-            </p>
-            <p className="text-xs text-gray-500 leading-tight mt-0.5">{c.label}</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              {loading ? '' : c.sub}
-            </p>
-          </div>
-        ))}
+  return <div className="space-y-6">
+    {error && <p className="p-3 rounded-lg border bg-slate-50 text-slate-700 text-sm" role="alert">{error}</p>}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {cards.map((card) => <div key={card.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+        <card.icon size={22} className="text-slate-600 mb-3" aria-hidden="true" />
+        <p className="text-xl font-bold text-slate-900">{loading || error ? '—' : card.value}</p>
+        <p className="text-xs text-slate-600 mt-1">{card.label}</p>
+        <p className="text-xs text-slate-500 mt-1">{card.sub}</p>
+      </div>)}
+    </div>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h2 className="font-semibold text-gray-900">Penilaian pada Laporan Terbaru</h2>
+        <Link href="/lahan" className="text-sm text-green-800 inline-flex gap-1 items-center">Lihat Lahan <ChevronRight size={16} aria-hidden="true" /></Link>
       </div>
-
-      {/* Widget Kondisi Lahan */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Kondisi Lahan</h2>
-          <Link
-            href="/lahan"
-            className="text-sm font-medium text-[#2E7D32] hover:underline inline-flex items-center gap-1"
-          >
-            Lihat Semua <ChevronRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-
-        <div className="p-4 sm:p-5">
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-1/3 mb-2" />
-                  <div className="h-2 bg-gray-200 rounded w-full" />
-                </div>
-              ))}
-            </div>
-          ) : conditions.length === 0 ? (
-            <div className="text-center py-6">
-              <Sprout className="w-10 h-10 text-gray-300 mx-auto mb-3" aria-hidden="true" />
-              <p className="text-sm text-gray-500">Belum ada lahan terdaftar.</p>
-              <Link
-                href="/lahan"
-                className="mt-3 inline-flex text-sm font-medium text-[#2E7D32] hover:underline"
-              >
-                Tambah Lahan
-              </Link>
-            </div>
-          ) : (
-            <ul className="space-y-5">
-              {conditions.slice(0, 4).map((c) => {
-                const info = c.status ? AI_STATUS_INFO[c.status] : null
-                return (
-                  <li key={c.id}>
-                    <div className="flex items-center justify-between gap-3 mb-1.5">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                        <p className="text-xs text-gray-400">{c.area.toFixed(1)} Ha</p>
-                      </div>
-                      {info ? (
-                        <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${info.badgeClass}`}>
-                          {info.label}
-                        </span>
-                      ) : (
-                        <span className="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                          Belum ada laporan
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${barClass(c.status)}`}
-                          style={{ width: `${c.health}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-gray-600 w-9 text-right">
-                        {c.health}%
-                      </span>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
+      <div className="p-4 sm:p-5 space-y-4">
+        {loading ? <p role="status">Memuat ringkasan…</p> : error ? <p className="text-sm text-slate-600">Penilaian belum tersedia.</p>
+          : conditions.length === 0 ? <p className="text-sm text-slate-600">Belum ada lahan terdaftar yang dimuat.</p>
+          : <ul className="space-y-5">{conditions.slice(0, 4).map((field) => <li key={field.id}>
+            <p className="font-medium text-sm">{field.name}</p>
+            <p className="text-xs text-slate-600 mb-2">Luas terdaftar: {formatHectares(registeredArea(field.area_hectares))}</p>
+            {field.report ? <AdvisoryAssessment assessment={reportAdvisory(field.report)} compact />
+              : <p className="text-xs text-slate-600">Belum ada laporan termuat; kondisi belum dinilai.</p>}
+          </li>)}</ul>}
+        <p className="text-xs text-slate-600">{UNKNOWN_AFFECTED_AREA_LABEL}. Ringkasan foto/laporan tidak mengukur persentase kesehatan atau kondisi seluruh bidang.</p>
       </div>
     </div>
-  )
+  </div>
 }

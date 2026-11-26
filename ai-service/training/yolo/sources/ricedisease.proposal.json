@@ -1,0 +1,30 @@
+{
+  "status": "PROPOSAL_NOT_APPROVED",
+  "coordinate_space": "exif_oriented_normalized_xywh",
+  "export_fingerprint": null,
+  "reviewed_by": "",
+  "review_protocol": "",
+  "grouping_reviewed": false,
+  "source": {
+    "id": "ricedisease_reviewed",
+    "url": "https://universe.roboflow.com/ricedisease-zwll3/rice_leaf_disease_detector",
+    "version": null,
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_verified": false,
+    "attribution": "RICE_LEAF_DISEASE_DETECTOR by ricedisease, Roboflow Universe; retain original creators/rights notices supplied in the chosen export.",
+    "permitted_uses_reviewed": [],
+    "evidence": []
+  },
+  "mappings": {
+    "Rice-Blast": {"action": "map", "canonical_class_id": 0, "canonical_class_name": "leaf_blast", "annotation_level": null, "approved": false, "reason": "Candidate only: reviewer must confirm leaf blast rather than neck/panicle blast and actual box scope."},
+    "Bacterial-Leaf-Blight": {"action": "map", "canonical_class_id": 1, "canonical_class_name": "bacterial_leaf_blight", "annotation_level": null, "approved": false, "reason": "Confirm diagnosis and lesion-versus-leaf scope."},
+    "Brown-Spot": {"action": "map", "canonical_class_id": 2, "canonical_class_name": "brown_spot", "annotation_level": null, "approved": false, "reason": "Do not include Narrow-Brown-Spot as an alias."},
+    "Sheath-Blight": {"action": "map", "canonical_class_id": 3, "canonical_class_name": "sheath_blight", "annotation_level": null, "approved": false, "reason": "Review actual anatomy and box scope."},
+    "Tungro-Virus": {"action": "map", "canonical_class_id": 4, "canonical_class_name": "tungro_symptom", "annotation_level": null, "approved": false, "reason": "Visual symptom candidate only; not laboratory confirmation of virus."},
+    "Healthy": {"action": "healthy_background", "approved": false, "reason": "Never a disease box. Negative status requires separate image-level review for all enabled target classes."},
+    "Narrow-Brown-Spot": {"action": "exclude_image", "approved": false, "reason": "Distinct unsupported diagnosis; do not merge into brown_spot."},
+    "False-Smut": {"action": "exclude_image", "approved": false, "reason": "Seen in v1 previews; unsupported canonical class."},
+    "Stem-Rot": {"action": "exclude_image", "approved": false, "reason": "Seen in v1 previews; unsupported canonical class."}
+  }
+}

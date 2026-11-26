@@ -1,11 +1,14 @@
-export type FloodStatus = 'aman' | 'waspada' | 'bahaya'
+import type { EwsSource } from '@/lib/ews/data'
+
+export type FloodStatus = 'aman' | 'waspada' | 'bahaya' | 'unknown' | 'stale'
 
 export interface FloodStatusResult {
   status: FloodStatus
   label: string
   description: string
-  color: 'green' | 'yellow' | 'red'
-  icon: 'check-circle' | 'alert-triangle' | 'alert-circle'
+  color: 'green' | 'yellow' | 'red' | 'gray'
+  icon: 'check-circle' | 'alert-triangle' | 'alert-circle' | 'help-circle' | 'clock'
+  complete: boolean
 }
 
 export const RAIN_THRESHOLD_WASPADA_MM = 20
@@ -48,6 +51,14 @@ export const STATUS_CONFIG: Record<FloodStatus, FloodStatusStyle> = {
     chipText: 'text-[#D32F2F]',
     dot: 'bg-[#D32F2F]',
   },
+  unknown: {
+    gradient: 'from-slate-600 to-slate-700', bannerClass: 'bg-slate-700',
+    iconBg: 'bg-white/20', chipBg: 'bg-slate-100', chipText: 'text-slate-700', dot: 'bg-slate-400',
+  },
+  stale: {
+    gradient: 'from-gray-600 to-gray-700', bannerClass: 'bg-gray-700',
+    iconBg: 'bg-white/20', chipBg: 'bg-gray-100', chipText: 'text-gray-700', dot: 'bg-gray-400',
+  },
 }
 
 export const STATUS_STYLE_FALLBACK: FloodStatusStyle = {
@@ -60,30 +71,29 @@ export const STATUS_STYLE_FALLBACK: FloodStatusStyle = {
 }
 
 export function calculateFloodStatus(
-  rain3hMm: number | null,
-  waterLevelM: number | null
+  weather: Pick<EwsSource, 'quality' | 'value'>,
+  water: Pick<EwsSource, 'quality' | 'value'>
 ): FloodStatusResult {
-  const hasRainData = rain3hMm !== null && rain3hMm !== undefined
-  const hasWaterData = waterLevelM !== null && waterLevelM !== undefined
-
-  if (!hasRainData && !hasWaterData) {
-    return {
-      status: 'aman',
-      label: 'Data Tidak Tersedia',
-      description: 'Data cuaca dan tinggi air belum tersedia',
-      color: 'green',
-      icon: 'check-circle',
-    }
-  }
-
-  let status: FloodStatus = 'aman'
-
-  if (hasRainData && rain3hMm! >= RAIN_THRESHOLD_BAHAYA_MM) {
+  const hasRainData = weather.quality === 'VALID' && typeof weather.value === 'number' &&
+    Number.isFinite(weather.value) && weather.value >= 0 && weather.value <= 1000
+  const hasWaterData = water.quality === 'VALID' && typeof water.value === 'number' &&
+    Number.isFinite(water.value) && water.value >= 0 && water.value <= 10
+  const complete = hasRainData && hasWaterData
+  let status: FloodStatus
+  if (hasRainData && weather.value! >= RAIN_THRESHOLD_BAHAYA_MM) {
     status = 'bahaya'
-  } else if (hasWaterData && waterLevelM! >= WATER_LEVEL_THRESHOLD_BAHAYA_M) {
+  } else if (hasWaterData && water.value! >= WATER_LEVEL_THRESHOLD_BAHAYA_M) {
     status = 'bahaya'
-  } else if (hasRainData && rain3hMm! >= RAIN_THRESHOLD_WASPADA_MM) {
+  } else if (hasRainData && weather.value! >= RAIN_THRESHOLD_WASPADA_MM) {
     status = 'waspada'
+  } else if (complete) {
+    status = 'aman'
+  } else if ([weather, water].some((s) => s.quality === 'MISSING' || s.quality === 'INVALID' || s.quality === 'MOCK') ||
+      (weather.quality === 'VALID' && !hasRainData) || (water.quality === 'VALID' && !hasWaterData)) {
+    status = 'unknown'
+  } else {
+    // A stale required source with no higher-priority missing/invalid/mock input.
+    status = 'stale'
   }
 
   switch (status) {
@@ -91,26 +101,37 @@ export function calculateFloodStatus(
       return {
         status: 'bahaya',
         label: 'BAHAYA',
-        description: 'Curah hujan tinggi atau tinggi air melebihi batas aman. Segera siapkan evakuasi.',
+        description: 'Indikator hujan atau tinggi air melewati ambang bahaya. Ikuti arahan petugas; ini bukan konfirmasi banjir di lahan.' +
+          (complete ? '' : ' Data lain belum layak digunakan; sinyal bahaya tetap ditampilkan.'),
         color: 'red',
         icon: 'alert-circle',
+        complete,
       }
     case 'waspada':
       return {
         status: 'waspada',
         label: 'WASPADA',
-        description: 'Curah hujan signifikan. Perhatikan perkembangan cuaca dan ketinggian air.',
+        description: 'Prakiraan hujan melewati ambang waspada. Pantau cuaca dan arahan petugas.' +
+          (complete ? '' : ' Data lain belum layak digunakan; penilaian masih terbatas.'),
         color: 'yellow',
         icon: 'alert-triangle',
+        complete,
       }
+    case 'unknown':
+      return { status, label: 'BELUM DIKETAHUI', color: 'gray', icon: 'help-circle', complete,
+        description: 'Data yang diperlukan belum tersedia atau belum dapat dipercaya. Kondisi aman belum dapat disimpulkan.' }
+    case 'stale':
+      return { status, label: 'DATA KEDALUWARSA', color: 'gray', icon: 'clock', complete,
+        description: 'Data melewati batas umur atau masa berlaku. Perbarui data sebelum menyimpulkan kondisi saat ini.' }
     case 'aman':
     default:
       return {
         status: 'aman',
         label: 'AMAN',
-        description: 'Kondisi normal. Tidak ada indikasi banjir.',
+        description: 'Kedua sumber layak digunakan dan belum melewati ambang. Ini bukan jaminan lahan bebas banjir.',
         color: 'green',
         icon: 'check-circle',
+        complete,
       }
   }
 }
@@ -128,13 +149,17 @@ export function getStaticRecommendation(status: FloodStatus): string[] {
       return [
         'Pantau perkembangan cuaca melalui aplikasi BMKG',
         'Periksa kondisi bendungan/pintu air terdekat',
-        'Siapkan perlengkapan darurat sebagaimana',
+        'Siapkan perlengkapan darurat sesuai arahan petugas',
         'Koordinasi dengan ketua Poktan/RT/RW setempat',
       ]
+    case 'unknown':
+    case 'stale':
+      return ['Perbarui informasi cuaca dan minta laporan tinggi air terkini',
+        'Jangan menganggap data tidak tersedia sebagai kondisi aman', 'Ikuti informasi petugas/BPBD setempat']
     case 'aman':
     default:
       return [
-        'Kondisi aman, lanjutkan aktivitas pertanian seperti biasa',
+        'Tetap pantau cuaca; indikator saat ini bukan jaminan bebas banjir',
         'Periksa saluran drainase secara berkala',
         'Jaga komunikasi dengan anggota Poktan',
       ]

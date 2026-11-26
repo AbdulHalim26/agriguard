@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { validatePolygon } from '@/lib/land/geometry'
 
 export interface GeoCoords {
   lat: number
@@ -62,17 +63,19 @@ export default function ScanMap({
   onPick: (c: GeoCoords) => void
   polygon: LngLatPolygon | null
 }) {
-  const polygonPositions = polygon
-    ? polygon.map(([lng, lat]) => [lat, lng] as [number, number])
+  const validation = useMemo(() => polygon ? validatePolygon(polygon) : null, [polygon])
+  const safePolygon = validation?.valid ? validation.original_ring : null
+  const polygonPositions = safePolygon
+    ? safePolygon.map(([lng, lat]) => [lat, lng] as [number, number])
     : null
 
   return (
-    <MapContainer center={DEFAULT_CENTER} zoom={16} className="h-56 w-full" scrollWheelZoom={false}>
+    <><MapContainer center={DEFAULT_CENTER} zoom={16} className="h-56 w-full" scrollWheelZoom={false}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <FitLahan polygon={polygon} />
+      <FitLahan polygon={safePolygon} />
       {polygonPositions && (
         <Polygon
           positions={polygonPositions}
@@ -81,5 +84,6 @@ export default function ScanMap({
       )}
       <LocationPicker coords={coords} onPick={onPick} />
     </MapContainer>
+    {validation && !validation.valid && <p className="text-xs text-slate-700 p-2" role="status">Batas tersimpan belum valid dan tidak digambar. Minta pendaftar/pengelola memeriksanya; koordinat asli tidak diubah.</p>}</>
   )
 }

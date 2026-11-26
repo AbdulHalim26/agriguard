@@ -1,0 +1,19 @@
+{
+  "ellipsoid": { "a_m": 6378137, "inverse_flattening": 298.257223563 },
+  "reference_method": "Independent Python stdlib analytic integral of the WGS84 surface element between meridians and parallels. Bounds [west,south,east,north]; not calculated using the application or GeographicLib. Short geodesic edges differ slightly from parallels; tolerance covers that distinction and double rounding.",
+  "formula": "a^2 * delta_lambda * (Q(phi_north)-Q(phi_south)); Q(phi)=(1-e^2)/2*(sin(phi)/(1-e^2*sin(phi)^2)+atanh(e*sin(phi))/e), e^2=f*(2-f)",
+  "cases": [
+    { "id": "karawang_001", "bounds": [107.285, -6.313, 107.286, -6.312], "area_m2": 12236.422579571597, "tolerance_m2": 0.01 },
+    { "id": "karawang_0001", "bounds": [107.285, -6.3121, 107.2851, -6.312], "area_m2": 122.36432929802905, "tolerance_m2": 0.01 },
+    { "id": "equator_001", "bounds": [0, 0, 0.001, 0.001], "area_m2": 12309.072078686677, "tolerance_m2": 0.01 },
+    { "id": "latitude_45_001", "bounds": [10, 45, 10.001, 45.001], "area_m2": 8762.313487978268, "tolerance_m2": 0.01 }
+  ],
+  "published_geodesic_vector": {
+    "source": "GeographicLib 2.2.0 test/geodesictest.js Planimeter0, non-polar diamond; published lat/lon points converted here to application lon/lat order",
+    "polygon": [[-1, 0], [0, -1], [1, 0], [0, 1]],
+    "area_m2": 24619419146,
+    "tolerance_m2": 1,
+    "perimeter_m": 627598.2731,
+    "perimeter_tolerance_m": 0.0001
+  }
+}

@@ -4,8 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { getOtpService, isMockMode } from '@/lib/auth/otp'
+import { submitOtp } from '@/lib/auth/otp'
 import { normalizePhone } from '@/lib/utils'
 import BrandLogo from '@/components/brand/BrandLogo'
 import { Waves, Sparkles, ClipboardList, Sprout } from 'lucide-react'
@@ -41,7 +40,7 @@ const COPY: Record<
 > = {
   login: {
     heading: 'Hai, selamat datang kembali',
-    subtitle: 'Masuk dengan nomor WhatsApp Anda',
+    subtitle: 'Masuk dengan kode OTP SMS ke nomor ponsel Anda',
     verifyLabel: 'Verifikasi & Masuk',
     switchText: 'Belum punya akun?',
     switchLabel: 'Daftar',
@@ -49,7 +48,7 @@ const COPY: Record<
   },
   register: {
     heading: 'Buat akun AgriGuard',
-    subtitle: 'Daftar dengan nomor WhatsApp Anda',
+    subtitle: 'Daftar dengan kode OTP SMS ke nomor ponsel Anda',
     verifyLabel: 'Verifikasi & Daftar',
     switchText: 'Sudah punya akun?',
     switchLabel: 'Masuk',
@@ -65,10 +64,6 @@ export default function OtpAuthView({ mode }: { mode: AuthMode }) {
   const [step, setStep] = useState<'phone' | 'code'>('phone')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mockCode, setMockCode] = useState<string | null>(null)
-
-  const otpService = getOtpService()
-  const mockMode = isMockMode()
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,17 +78,10 @@ export default function OtpAuthView({ mode }: { mode: AuthMode }) {
     }
 
     try {
-      const result = await otpService.requestOtp(normalizedPhone)
-      if (result.success) {
-        setStep('code')
-        if (mockMode && result.code) {
-          setMockCode(result.code)
-        }
-      } else {
-        setError(result.error || 'Gagal mengirim OTP')
-      }
-    } catch {
-      setError('Terjadi kesalahan. Coba lagi.')
+      await submitOtp({ phone: normalizedPhone, mode })
+      setStep('code')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Gagal mengirim OTP.')
     } finally {
       setLoading(false)
     }
@@ -107,59 +95,12 @@ export default function OtpAuthView({ mode }: { mode: AuthMode }) {
     const normalizedPhone = normalizePhone(phone)
 
     try {
-      const result = await otpService.verifyOtp(normalizedPhone, code)
-      if (result.success) {
-        const supabase = createClient()
-
-        const email = `${normalizedPhone}@otp.agriguard.id`
-        const password = `AgriGuard-${normalizedPhone.slice(-6)}`
-
-        let { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (signInError) {
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                phone: normalizedPhone,
-                full_name: '',
-                role: 'petani',
-              },
-            },
-          })
-
-          if (signUpError) {
-            throw signUpError
-          }
-
-          authData = signUpData
-        }
-
-        if (authData.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role, full_name')
-            .eq('id', authData.user.id)
-            .single()
-
-          if (profile?.full_name) {
-            router.push('/dashboard')
-            router.refresh()
-          } else {
-            router.push('/onboarding')
-          }
-        } else {
-          router.push('/onboarding')
-        }
-      } else {
-        setError(result.error || 'Kode OTP salah')
-      }
-    } catch {
-      setError('Terjadi kesalahan. Coba lagi.')
+      const result = await submitOtp({ phone: normalizedPhone, code, mode })
+      if (!result.next) throw new Error('Sesi OTP belum tersedia.')
+      router.push(result.next)
+      router.refresh()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Verifikasi OTP gagal.')
     } finally {
       setLoading(false)
     }
@@ -233,19 +174,12 @@ export default function OtpAuthView({ mode }: { mode: AuthMode }) {
             </div>
           )}
 
-          {mockMode && mockCode && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm" role="status">
-              <strong>Mode Demo: </strong>Kode OTP Anda adalah{' '}
-              <code className="px-1.5 py-0.5 bg-amber-100 rounded font-mono">{mockCode}</code>
-            </div>
-          )}
-
           {step === 'phone' && (
             <form onSubmit={handleRequestOtp}>
               <div className="space-y-4">
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Nomor WhatsApp
+                    Nomor ponsel
                   </label>
                   <input
                     id="phone"

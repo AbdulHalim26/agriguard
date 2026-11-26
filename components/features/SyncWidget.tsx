@@ -27,12 +27,12 @@ export default function SyncWidget({ userId }: { userId: string }) {
     if (!isOnline()) {
       setMessage('Sedang offline — laporan tetap tersimpan di perangkat ini.')
     } else {
-      const result = await syncReports()
+      const result = await syncReports({ retryBlocked: true })
       if (result.syncedCount > 0) {
         setMessage(`Berhasil menyinkronkan ${result.syncedCount} laporan.`)
       } else if (result.skippedCount > 0) {
         setMessage(result.errors[0] || 'Sebagian laporan dilewati.')
-      } else if (result.failedCount > 0) {
+      } else if (result.failedCount > 0 || !result.success) {
         setMessage(result.errors[0] || 'Beberapa laporan gagal disinkronkan.')
       }
     }

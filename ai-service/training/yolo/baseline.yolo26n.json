@@ -1,0 +1,21 @@
+{
+  "experiment_id": "rice-yolo26n-baseline-01",
+  "status": "PLANNED_NOT_RUN",
+  "family": "yolo26n",
+  "output_format": "end2end_xyxy",
+  "imgsz": 640,
+  "epochs": 50,
+  "batch": 8,
+  "seed": 42,
+  "optimizer": "AdamW",
+  "lr0": 0.001,
+  "lrf": 0.01,
+  "weight_decay": 0.0005,
+  "patience": 15,
+  "close_mosaic": 10,
+  "workers": 0,
+  "amp": false,
+  "deterministic": true,
+  "device": "cpu",
+  "note": "Reference defaults, not a launch file. Prefer a verified CUDA training host; explicitly pass --device 0 there. CPU is the portable fallback. Choose a new run if batch/device changes; no metric claims."
+}

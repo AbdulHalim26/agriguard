@@ -1,0 +1,32 @@
+{
+  "status": "PROPOSAL_NOT_APPROVED",
+  "coordinate_space": "exif_oriented_normalized_xywh",
+  "export_fingerprint": null,
+  "reviewed_by": "",
+  "review_protocol": "",
+  "grouping_reviewed": false,
+  "source": {
+    "id": "irri_named_project_reviewed",
+    "url": "https://universe.roboflow.com/irri-rice-leaf/irri-rice-leaf-disease-detection",
+    "version": null,
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_verified": false,
+    "attribution": "IRRI rice leaf Disease Detection by the Roboflow workspace named IRRI rice leaf. Institutional affiliation and original photo provenance remain unverified.",
+    "permitted_uses_reviewed": [],
+    "evidence": []
+  },
+  "mappings": {
+    "Bacterial leaf blight of Rice": {"action": "map", "canonical_class_id": 1, "canonical_class_name": "bacterial_leaf_blight", "annotation_level": null, "approved": false, "reason": "Review diagnosis and annotation scope."},
+    "Blast of rice": {"action": "map", "canonical_class_id": 0, "canonical_class_name": "leaf_blast", "annotation_level": null, "approved": false, "reason": "Confirm leaf blast, not a different blast location."},
+    "Brown spot of leaf": {"action": "map", "canonical_class_id": 2, "canonical_class_name": "brown_spot", "annotation_level": null, "approved": false, "reason": "Potential alias, separate reviewer approval required."},
+    "Brown spot of rice leaf": {"action": "map", "canonical_class_id": 2, "canonical_class_name": "brown_spot", "annotation_level": null, "approved": false, "reason": "Potential alias, separate reviewer approval required."},
+    "Brown spot of riceleaf": {"action": "map", "canonical_class_id": 2, "canonical_class_name": "brown_spot", "annotation_level": null, "approved": false, "reason": "Potential alias, separate reviewer approval required."},
+    "Blight of rice": {"action": "exclude_image", "approved": false, "reason": "Ambiguous blight diagnosis; not automatically bacterial leaf blight."},
+    "bite of caterpillar": {"action": "exclude_image", "approved": false, "reason": "Generic feeding damage is not verified leaf-folder damage."},
+    "Dot diseases": {"action": "exclude_image", "approved": false, "reason": "Ambiguous visual label, not automatically brown_spot."},
+    "b": {"action": "exclude_image", "approved": false, "reason": "Undefined source label."},
+    "objects": {"action": "exclude_image", "approved": false, "reason": "Undefined source label."},
+    "Smut": {"action": "exclude_image", "approved": false, "reason": "Unsupported canonical class."}
+  }
+}

@@ -17,6 +17,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+
+from detection.adapter import DetectorError, DetectorUnavailable, InvalidDetectionImage, get_detector
+from detection.contracts import DetectionFailure, DetectionResponse
 
 from predict import (
     MODEL_NAME,
@@ -99,3 +103,22 @@ async def predict(image: UploadFile = File(...)):
         ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/predict/detect", response_model=DetectionResponse, responses={
+    400: {"model": DetectionFailure}, 502: {"model": DetectionFailure}, 503: {"model": DetectionFailure},
+})
+async def detect(image: UploadFile = File(...)):
+    """Independent, OFF-by-default detector. No classifier fallback or fake boxes."""
+    try:
+        detector = await run_in_threadpool(get_detector)
+        if (image.content_type or "").lower() not in ALLOWED_MIME:
+            raise InvalidDetectionImage("Format gambar harus JPG atau PNG.")
+        data = await image.read(MAX_BYTES + 1)
+        return await run_in_threadpool(detector.detect, data)
+    except DetectorError as exc:
+        body = DetectionFailure(
+            inference_status="UNAVAILABLE" if isinstance(exc, DetectorUnavailable) else "ERROR",
+            error_code=exc.code, error=str(exc),
+        )
+        return JSONResponse(status_code=exc.status, content=body.model_dump())

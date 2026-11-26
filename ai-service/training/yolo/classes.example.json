@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "purpose": "model_training",
+  "coordinate_space": "exif_oriented_normalized_xywh",
+  "reviewed_by": "",
+  "review_protocol": "",
+  "minimum_instances_per_class_per_split": null,
+  "minimum_groups_per_class_per_split": null,
+  "sources": [],
+  "classes": [
+    {"class_id": 0, "class_name": "leaf_blast", "annotation_level": "lesion", "enabled": false},
+    {"class_id": 1, "class_name": "bacterial_leaf_blight", "annotation_level": "lesion", "enabled": false},
+    {"class_id": 2, "class_name": "brown_spot", "annotation_level": "lesion", "enabled": false},
+    {"class_id": 3, "class_name": "sheath_blight", "annotation_level": "lesion", "enabled": false},
+    {"class_id": 4, "class_name": "tungro_symptom", "annotation_level": "leaf", "enabled": false},
+    {"class_id": 5, "class_name": "leaf_folder_damage", "annotation_level": "leaf", "enabled": false}
+  ]
+}

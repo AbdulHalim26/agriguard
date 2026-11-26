@@ -1,3 +1,6 @@
+import { aiResultSchema } from '@/lib/reports/evidence'
+export type { DetectionResponse, ObjectDetection, BoundingBox } from '@/lib/detection'
+
 export interface AiAnalysisResult {
   status: 'aman' | 'rusak_ringan' | 'rusak_berat'
   confidence: number
@@ -5,7 +8,7 @@ export interface AiAnalysisResult {
 }
 
 // Foto ditolak gerbang domain/kualitas AI (HTTP 422) — bukan kegagalan teknis.
-// Frontend menampilkan pesan + tombol "Ambil Ulang Foto" (bukan lapor manual).
+// Frontend preserves the photo and offers retake or explicitly untrusted manual reporting.
 export class AiRejectedError extends Error {
   constructor(message: string) {
     super(message)
@@ -50,13 +53,7 @@ export async function analyzeImage(image: Blob, timeoutMs = AI_TIMEOUT_MS): Prom
 
     const data = await response.json()
 
-    if (
-      !data ||
-      typeof data.status !== 'string' ||
-      !['aman', 'rusak_ringan', 'rusak_berat'].includes(data.status) ||
-      typeof data.confidence !== 'number' ||
-      typeof data.damage_pct !== 'number'
-    ) {
+    if (!aiResultSchema.safeParse(data).success) {
       throw new Error('Respons AI tidak valid')
     }
 

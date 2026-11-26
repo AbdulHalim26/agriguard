@@ -1,221 +1,56 @@
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getSupabaseConfig, supabaseNotConfiguredMessage } from '@/lib/supabase/env'
+import { getPhoneOtpUser } from '@/lib/auth/session'
+import { getSupabaseConfig } from '@/lib/supabase/env'
 
-function createMockQueryBuilder(data: any[]) {
-  let filtered = [...data]
+const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi', '/audit', '/notifikasi', '/settings', '/onboarding']
 
-  const chainable = {
-    select: () => chainable,
-    data: filtered,
-    error: null,
-    eq: (col: string, val: any) => {
-      filtered = filtered.filter(row => row[col] === val)
-      return chainable
-    },
-    single: () => ({ data: filtered[0] || null, error: filtered[0] ? null : { message: 'Not found' } }),
-  }
-  return chainable
-}
-
-function createMockSupabaseServer(request: NextRequest) {
-  // Read mock session from cookie
-  let mockUser: any = null
-  const sessionCookie = request.cookies.get('agriguard-mock-session')
-  if (sessionCookie) {
-    try {
-      const session = JSON.parse(sessionCookie.value)
-      mockUser = session.user
-    } catch {
-      // ignore parse errors
-    }
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const protectedRoute = protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+  const loginRoute = pathname === '/login' || pathname === '/daftar'
+  const { url, anonKey, isConfigured } = getSupabaseConfig()
+  let response = NextResponse.next({ request })
+  const redirect = (path: string) => {
+    const result = NextResponse.redirect(new URL(path, request.url))
+    response.cookies.getAll().forEach((cookie) => result.cookies.set(cookie))
+    return result
   }
 
-  // Base mock data
-  const baseProfiles = [
-    { id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', phone: '6281234567890', full_name: 'Budi Santoso', role: 'petani', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
-    { id: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', phone: '6281234567891', full_name: 'Siti Rahayu', role: 'petani', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
-    { id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', phone: '6281234567892', full_name: 'Pak PPL Sutrisno', role: 'ppl', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
-    { id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', phone: '6281234567893', full_name: 'Bu Dinas Lestari', role: 'dinas', poktan_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
-  ]
+  if (!isConfigured) return protectedRoute ? redirect('/login') : response
 
-  // If we have a mock user from session, use/add it
-  const profiles = mockUser ? [...baseProfiles, mockUser] : baseProfiles
-
-  return {
-    auth: {
-      getUser: async () => {
-        if (mockUser) {
-          return { data: { user: mockUser }, error: null }
-        }
-        return { data: { user: null }, error: null }
-      },
-    },
-    from: (table: string) => {
-      const mockData: Record<string, any[]> = {
-        profiles,
-        poktan: [
-          { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Poktan Sukamaju — Karawang', village: 'Sukamaju', district: 'Telukjambe Timur', invite_code: 'DEMO01' },
-        ],
-      }
-
-      const data = mockData[table] || []
-
-      return {
-        select: () => createMockQueryBuilder(data),
-        update: (row: any) => ({
-          data: [row],
-          error: null,
-          eq: () => ({ data: [row], error: null }),
-        }),
-      }
-    },
-  } as any
-}
-
-async function fetchProfile(
-  request: NextRequest,
-  isConfigured: boolean,
-  url: string,
-  anonKey: string,
-  userId: string
-) {
-  if (isConfigured) {
-    const { createServerClient } = await import('@supabase/ssr')
+  try {
     const supabase = createServerClient(url, anonKey, {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll: () => request.cookies.getAll(),
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
         },
       },
     })
-    const { data } = await supabase.from('profiles').select('full_name, role').eq('id', userId).single()
-    return data
+    const { data: { user }, error } = await getPhoneOtpUser(supabase.auth)
+    if (error || !user) return protectedRoute ? redirect('/login') : response
+
+    if (protectedRoute || loginRoute) {
+      const { data: profile, error: profileError } = await supabase.from('profiles')
+        .select('full_name, role, phone').eq('id', user.id).single()
+      if (profileError || profile?.phone !== user.phone) return protectedRoute ? redirect('/login') : response
+      if (loginRoute) return redirect(profile?.full_name ? '/dashboard' : '/onboarding')
+      if (!profile?.full_name && pathname !== '/onboarding') return redirect('/onboarding')
+      if (profile?.full_name && pathname === '/onboarding') return redirect('/dashboard')
+      if ((pathname.startsWith('/verifikasi') || pathname.startsWith('/audit')) &&
+          profile?.role !== 'ppl' && profile?.role !== 'dinas') return redirect('/dashboard')
+    }
+  } catch {
+    // Failed verification is never an authenticated session. An already open
+    // offline scan still uses IndexedDB; server-rendered protected data stays closed.
+    if (protectedRoute) return redirect('/login')
   }
-  const mock = createMockSupabaseServer(request)
-  const { data } = await mock.from('profiles').select('full_name, role').eq('id', userId).single()
-  return data
-}
-
-export async function middleware(request: NextRequest) {
-  const { url, anonKey, isConfigured } = getSupabaseConfig()
-
-  if (!isConfigured && process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
-    console.warn('[supabase] middleware: MOCK MODE ACTIVE (Supabase envar kosong).')
-  }
-
-  const pathname = request.nextUrl.pathname
-
-  // Public / protected route sets (dipakai di beberapa cabang logika di bawah).
-  const publicRoutes = ['/login', '/daftar', '/onboarding']
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
-
-  const protectedRoutes = ['/dashboard', '/lahan', '/scan', '/laporan', '/peta', '/verifikasi', '/notifikasi', '/settings']
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-
-  // Kunci pembeda online/offline: apakah browser MEMBAWA session cookie Supabase.
-  // - Tanpa cookie sama sekali & refresh gagal  -> anonim, redirect ke /login.
-  // - Ada cookie tapi refresh gagal (offline)   -> izinkan (offline-first).
-  const hasSessionCookie = request.cookies
-    .getAll()
-    .some((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'))
-
-  const redirectToLogin = () => {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  try {
-    // Use mock client only when env vars are truly empty
-    const supabase = isConfigured
-      ? (await import('@supabase/ssr')).createServerClient(url, anonKey, {
-          cookies: {
-            getAll() {
-              return request.cookies.getAll()
-            },
-            setAll(cookiesToSet) {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                request.cookies.set(name, value)
-              )
-            },
-          },
-        })
-      : createMockSupabaseServer(request)
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    // Refresh session gagal. Bedakan berdasarkan ADA/TIDAKNYA cookie:
-    // - Ada cookie (kemungkinan offline) -> jangan blokir (offline-first).
-    // - Tidak ada cookie & rute terproteksi -> anonim, arahkan ke /login.
-    if (authError && !user) {
-      if (!hasSessionCookie && isProtectedRoute) {
-        return redirectToLogin()
-      }
-      return NextResponse.next()
-    }
-
-    // Auth routes - redirect if already logged in
-    if (isPublicRoute && user) {
-      const profile = await fetchProfile(request, isConfigured, url, anonKey, user.id)
-      const fullName = profile?.full_name || user.user_metadata?.full_name
-
-      if (pathname === '/onboarding') {
-        // Never redirect /onboarding to itself (would cause an infinite loop).
-        // Allow filling the form if profile is incomplete, otherwise go to dashboard.
-        if (fullName) {
-          return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
-      } else {
-        return NextResponse.redirect(fullName ? new URL('/dashboard', request.url) : new URL('/onboarding', request.url))
-      }
-    }
-
-    // Protected routes - redirect to login if not authenticated
-    if (isProtectedRoute && !user) {
-      return redirectToLogin()
-    }
-
-    // Check onboarding completion for app routes (except onboarding itself)
-    if (user && isProtectedRoute) {
-      const profile = await fetchProfile(request, isConfigured, url, anonKey, user.id)
-
-      const fullName = profile?.full_name || user.user_metadata?.full_name
-
-      if (!fullName) {
-        return NextResponse.redirect(new URL('/onboarding', request.url))
-      }
-
-      // Role-based access for verifikasi (ppl/dinas only)
-      if (pathname.startsWith('/verifikasi')) {
-        const role = profile?.role || user.user_metadata?.role
-        if (role !== 'ppl' && role !== 'dinas') {
-          return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('[supabase] middleware: gagal verifikasi (offline?), lanjut tanpa blokir.', error)
-    // Tanpa cookie + rute terproteksi -> tetap anggap anonim (redirect), bukan
-    // membuka shell. Dengan cookie -> biarkan offline-first berjalan.
-    if (!hasSessionCookie && isProtectedRoute) {
-      return redirectToLogin()
-    }
-    return NextResponse.next()
-  }
-
-  return NextResponse.next()
+  return response
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

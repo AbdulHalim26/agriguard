@@ -48,8 +48,8 @@ const AI_STEPS = [
   { icon: ImageUp, title: 'Unggah foto', description: 'Foto daun atau sawah diambil dari kamera.' },
   { icon: PackageCheck, title: 'Kompres di perangkat', description: 'Ukuran foto diperkecil agar hemat kuota; aman saat offline.' },
   { icon: Cpu, title: 'Analisis model AI', description: 'Model EffNet-B0 memproses gambar di server.' },
-  { icon: BadgeCheck, title: 'Klasifikasi kerusakan', description: 'Hasil: Aman, Rusak Ringan, atau Rusak Berat, plus confidence.' },
-  { icon: Lightbulb, title: 'Rekomendasi tindakan', description: 'Langkah penanganan menyesuaikan tingkat kerusakan.' },
+  { icon: BadgeCheck, title: 'Indikasi visual awal', description: 'Label foto dan keyakinan model, bukan persen kerusakan atau luas rusak.' },
+  { icon: Lightbulb, title: 'Perlu verifikasi', description: 'REVIEW_REQUIRED. Minta peninjauan PPL/Dinas; klaim tetap pada penanggung.' },
 ]
 
 export default function CaraKerjaPage() {
@@ -117,8 +117,8 @@ export default function CaraKerjaPage() {
           </div>
           <h3 className={`text-lg font-semibold mb-2 ${NAVY}`}>Untuk PPL &amp; Dinas</h3>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Petugas meninjau laporan petani, memberi catatan verifikasi, dan melihat rekap luas
-            terdampak per wilayah melalui dasbor admin.
+            Petugas meninjau laporan, memberi catatan, dan melihat luas terdaftar unik dalam scope rekap.
+            Luas terdampak belum terverifikasi tanpa pengukuran independen.
           </p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_12px_30px_-20px_rgba(11,37,69,0.35)]">

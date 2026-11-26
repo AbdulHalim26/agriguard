@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Bell, AlertTriangle, FileCheck2, RefreshCw, ChevronRight } from 'lucide-react'
 import { useNotifications, formatRelativeTime, type NotifType } from '@/lib/notifications'
+import { formatWib } from '@/lib/ews/data'
 
 const TYPE_STYLE: Record<NotifType, { icon: typeof Bell; wrap: string; color: string }> = {
   peringatan: { icon: AlertTriangle, wrap: 'bg-amber-100', color: 'text-[#ED6C02]' },
@@ -57,7 +58,7 @@ export default function NotifikasiWidget({ userId }: { userId: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900 truncate">{n.title}</p>
                     <p className="text-xs text-gray-500 line-clamp-2">{n.description}</p>
-                    <p className="text-[11px] text-gray-400 mt-1">{formatRelativeTime(n.time)}</p>
+                    <p className="text-[11px] text-gray-500 mt-1">{n.timeLabel ? `${n.timeLabel}: ${formatWib(n.time)}` : formatRelativeTime(n.time)}</p>
                   </div>
                 </div>
               )

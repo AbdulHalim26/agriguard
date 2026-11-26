@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, X, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
 import { MapContainer, TileLayer, Polygon, Marker, LayersControl, useMap, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import * as Leaflet from 'leaflet'
 import { createLahan } from './actions'
 import LocateControl from '@/components/map/LocateControl'
+import { assessLandGeometry, validatePolygon } from '@/lib/land/geometry'
+import LandGeometrySummary from '@/components/features/LandGeometrySummary'
 
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
 const DEFAULT_ZOOM = 16
@@ -51,6 +53,7 @@ function MapPolygonEditor({ onPolygonChange, initialPolygon }: MapPolygonEditorP
   const [points, setPoints] = useState<number[][]>(initialPolygon || [])
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [map, setMap] = useState<Leaflet.Map | null>(null)
+  const validation = useMemo(() => validatePolygon(points), [points])
 
   useEffect(() => {
     if (initialPolygon) {
@@ -175,30 +178,14 @@ function MapPolygonEditor({ onPolygonChange, initialPolygon }: MapPolygonEditorP
           )}
         </div>
         <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-          <span className={`flex items-center gap-1 ${points.length >= 3 ? 'text-green-600' : 'text-red-600'}`}>
-            {points.length >= 3 ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-            {points.length} titik {points.length >= 3 ? '(valid)' : '- minimal 3'}
+          <span className={`flex items-center gap-1 ${validation.valid ? 'text-slate-700' : 'text-red-600'}`}>
+            {validation.valid ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+            {points.length} posisi · {validation.valid ? 'struktur valid, belum diverifikasi' : validation.errors[0]?.code}
           </span>
-          {points.length > 0 && (
-            <span className="flex items-center gap-1">
-              Luas ~{calculateArea(points).toFixed(2)} Ha
-            </span>
-          )}
         </div>
       </div>
     </div>
   )
-}
-
-function calculateArea(polygon: number[][]): number {
-  if (polygon.length < 3) return 0
-  let area = 0
-  for (let i = 0; i < polygon.length; i++) {
-    const j = (i + 1) % polygon.length
-    area += polygon[i][0] * polygon[j][1]
-    area -= polygon[j][0] * polygon[i][1]
-  }
-  return Math.abs(area) / 2 * 111000 * 111000 / 10000
 }
 
 export default function LahanForm() {
@@ -208,6 +195,7 @@ export default function LahanForm() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const assessment = useMemo(() => assessLandGeometry(polygon, area), [polygon, area])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -217,12 +205,12 @@ export default function LahanForm() {
       setError('Nama lahan wajib diisi')
       return
     }
-    if (!area || parseFloat(area) <= 0) {
-      setError('Luas harus lebih dari 0')
+    if (assessment.declared_area_hectares === null) {
+      setError('Luas deklarasi harus angka lebih dari 0 dan maksimal 1000 ha.')
       return
     }
-    if (polygon.length < 3) {
-      setError('Polygon minimal 3 titik. Klik peta untuk menambah titik.')
+    if (!assessment.geometry.valid) {
+      setError(`${assessment.geometry.errors[0].message} (${assessment.geometry.errors[0].code})`)
       return
     }
 
@@ -290,19 +278,21 @@ export default function LahanForm() {
 
         <div>
           <label htmlFor="area" className="block text-sm font-medium text-gray-700 mb-1">
-            Luas (Hektar) <span className="text-red-500">*</span>
+            Luas deklarasi (ha) <span className="text-red-500">*</span>
           </label>
           <input
             id="area"
             type="number"
-            step="0.01"
-            min="0.01"
+            step="any"
+            min="0"
+            max="1000"
             value={area}
             onChange={e => setArea(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             placeholder="Contoh: 0.75"
             required
           />
+          <p className="text-xs text-slate-600 mt-1">Isi nilai pendaftaran Anda; hasil hitung peta tidak menggantinya otomatis.</p>
         </div>
 
         <div>
@@ -315,6 +305,7 @@ export default function LahanForm() {
           />
         </div>
 
+        <LandGeometrySummary assessment={assessment} />
         <button
           type="submit"
           disabled={submitting}

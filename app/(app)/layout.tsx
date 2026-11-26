@@ -6,9 +6,12 @@ import { usePathname } from 'next/navigation'
 import BrandLogo from '@/components/brand/BrandLogo'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
+import { cancelSync } from '@/lib/offline/sync'
+import { rememberOfflineUser } from '@/lib/offline/identity'
 import AutoSync from '@/components/AutoSync'
 import OfflineBanner from '@/components/features/OfflineBanner'
 import PendingReportsBadge from '@/components/features/PendingReportsBadge'
+import FloodAssessmentProvider from '@/components/features/FloodAssessmentProvider'
 import {
   LayoutDashboard,
   MapPin,
@@ -100,8 +103,11 @@ export default function AppLayout({
   }, [])
 
   const handleSignOut = async () => {
+    cancelSync()
+    rememberOfflineUser(null)
     const supabase = createClient()
-    await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) { window.alert('Logout belum berhasil. Periksa koneksi dan coba lagi.'); return }
     window.location.href = '/login'
   }
 
@@ -324,7 +330,11 @@ export default function AppLayout({
           </div>
         </header>
 
-        <main className="p-4 lg:p-6 print:p-0">{children}</main>
+        <main className="p-4 lg:p-6 print:p-0">
+          <FloodAssessmentProvider active={['/dashboard', '/notifikasi', '/verifikasi'].some((route) => pathname.startsWith(route))}>
+            {children}
+          </FloodAssessmentProvider>
+        </main>
       </div>
     </div>
   )

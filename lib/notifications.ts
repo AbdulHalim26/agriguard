@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { listMyReports } from '@/app/(app)/laporan/actions'
-import { getFloodStatus } from '@/app/(app)/dashboard/flood-actions'
+import { useFloodAssessment } from '@/components/features/FloodAssessmentProvider'
+import { floodNotification } from '@/lib/ews/assessment'
 import { getReportCount, subscribeQueue } from '@/lib/offline/db'
+import { INSURANCE_NOTICE } from '@/lib/reports/advisory'
 
 export type NotifType = 'peringatan' | 'laporan' | 'sistem'
 
@@ -12,7 +14,8 @@ export interface NotifItem {
   type: NotifType
   title: string
   description: string
-  time: string
+  time: string | null
+  timeLabel?: string
   href?: string
 }
 
@@ -26,19 +29,25 @@ export function useNotifications(userId?: string | null): {
   reload: () => void
 } {
   const [items, setItems] = useState<NotifItem[]>([])
+  const [ownerId, setOwnerId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [nonce, setNonce] = useState(0)
+  const flood = useFloodAssessment()
 
-  const reload = useCallback(() => setNonce((n) => n + 1), [])
+  const reload = useCallback(() => { setNonce((n) => n + 1); flood.refresh() }, [flood.refresh])
 
   useEffect(() => {
     let cancelled = false
+    setItems([])
+    setOwnerId(null)
+    setLoading(true)
 
     const build = async () => {
       const out: NotifItem[] = []
 
       // 1) Verifikasi laporan user
       try {
+        if (!userId) return
         const res = await listMyReports()
         for (const r of res.data || []) {
           if (!r.verified_at) continue
@@ -47,29 +56,12 @@ export function useNotifications(userId?: string | null): {
             type: 'laporan',
             title: r.is_verified ? 'Laporan Terverifikasi' : 'Laporan Ditolak',
             description: r.is_verified
-              ? `Laporan di ${r.lahan?.name || 'lahan Anda'} telah divalidasi PPL.`
+              ? `Laporan di ${r.lahan?.name || 'lahan Anda'} telah divalidasi PPL. ${INSURANCE_NOTICE}`
               : `Laporan di ${r.lahan?.name || 'lahan Anda'} ditolak${
                   r.verification_note ? `: ${r.verification_note}` : '.'
-                }`,
+                } ${INSURANCE_NOTICE}`,
             time: r.verified_at,
             href: '/laporan',
-          })
-        }
-      } catch {
-        // offline / gagal -> lewati
-      }
-
-      // 2) Perubahan status banjir wilayah (hanya saat bukan aman)
-      try {
-        const flood = await getFloodStatus()
-        if (flood.data && flood.data.status !== 'aman') {
-          out.push({
-            id: `flood-${flood.data.status}`,
-            type: 'peringatan',
-            title: `Peringatan Banjir — ${flood.data.label}`,
-            description: flood.data.description,
-            time: new Date().toISOString(),
-            href: '/dashboard',
           })
         }
       } catch {
@@ -95,25 +87,35 @@ export function useNotifications(userId?: string | null): {
         }
       }
 
-      out.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+      out.sort((a, b) => Date.parse(b.time || '') - Date.parse(a.time || ''))
       if (!cancelled) {
         setItems(out)
+        setOwnerId(userId || null)
         setLoading(false)
       }
     }
 
-    build()
-    const unsub = subscribeQueue(reload)
+    if (userId) void build()
+    else setLoading(false)
+    const unsub = subscribeQueue(() => setNonce((n) => n + 1))
     return () => {
       cancelled = true
       unsub()
     }
-  }, [userId, nonce, reload])
+  }, [userId, nonce])
 
-  return { items, loading, reload }
+  const notice = flood.data?.user_id === userId ? floodNotification(flood.data) : null
+  const unavailable: NotifItem | null = !flood.loading && !flood.data ? {
+    id: 'flood-unavailable', type: 'sistem', title: 'Indikator banjir — BELUM DIKETAHUI',
+    description: flood.error || 'Penilaian server belum tersedia. Kondisi aman belum dapat disimpulkan.',
+    time: null, href: '/dashboard',
+  } : null
+  return { items: [...(notice && !flood.loading ? [notice] : unavailable ? [unavailable] : []), ...(ownerId === userId ? items : [])],
+    loading: loading || flood.loading, reload }
 }
 
-export function formatRelativeTime(value: string): string {
+export function formatRelativeTime(value: string | null): string {
+  if (!value) return 'Waktu penilaian belum tersedia'
   const now = Date.now()
   const then = new Date(value).getTime()
   if (isNaN(then)) return '—'

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' file: data:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>AgriGuard — Offline Review Workspace</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#viewer-heading">Lewati antrean ke viewer</a>
+  <header class="app-header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">AG</span><div><h1>AgriGuard Review</h1><p>Offline · QA manusia · bukan approval training</p></div></div>
+    <div class="progress-overview"><div id="progress" aria-live="polite"></div><progress id="progress-bar" aria-label="Progres pilot resolved QA" value="0" max="1"></progress></div>
+    <span id="version" class="version-pill"></span>
+  </header>
+  <section class="session-bar" aria-label="Ekspor dan impor eksplisit">
+    <button id="export" type="button" disabled>Ekspor keputusan</button>
+    <label class="file-control" for="import">Impor file versi tersimpan <input id="import" type="file" accept="application/json,.json"></label>
+    <button id="assessment-export" type="button">Ekspor ringkasan read-only</button>
+    <a href="ux-guide.md" target="_blank" rel="noopener">Panduan UI</a><a href="workflow.md" target="_blank" rel="noopener">Workflow & versi</a><a href="qa/index.html" target="_blank" rel="noopener">Galeri asal</a>
+    <details class="header-details"><summary>Versi & integritas</summary><pre id="integrity-metadata"></pre></details>
+  </section>
+  <div id="memory-state" class="memory-state" role="status" aria-live="polite">Belum ada perubahan sesi. Tidak ada auto-save ke disk.</div>
+  <p id="message" role="status" aria-live="polite"></p>
+  <main class="workspace-grid">
+    <aside class="panel queue-panel" aria-labelledby="queue-heading">
+      <div class="panel-heading"><h2 id="queue-heading">Antrean review</h2><span id="queue-total" class="count-pill"></span></div>
+      <form id="search-form" class="search-form" role="search"><label for="search-query">Cari ID, kelas, atau nama gambar</label><div><input id="search-query" type="search" autocomplete="off" placeholder="Misalnya Rice-Blast atau ID record"><button type="submit">Cari</button><button id="clear-search" type="button" aria-label="Hapus pencarian">×</button></div></form>
+      <details class="queue-filters" open><summary>Filter antrean</summary><div class="filters">
+        <label for="queue">Antrean<select id="queue"><option value="pilot">Pilot terfokus</option><option value="all">Seluruh record</option></select></label>
+        <label for="type">Jenis<select id="type"><option value="all">Semua</option><option value="image">Gambar</option><option value="annotation">Anotasi</option><option value="leakage_pair">Pasangan lintas split</option></select></label>
+        <label for="class-filter">Kelas sumber<select id="class-filter"><option value="">Semua</option></select></label>
+        <label for="split">Split<select id="split"><option value="">Semua</option></select></label>
+        <label for="issue">Issue<select id="issue"><option value="">Semua</option></select></label>
+        <label for="status">Status<select id="status"><option value="needs_work">Pending / tindak lanjut</option><option value="all">Semua</option><option value="pending">Belum direview</option><option value="accept">ACCEPT</option><option value="revise">REVISE</option><option value="exclude">EXCLUDE</option><option value="unresolved">UNRESOLVED</option></select></label>
+      </div></details>
+      <p id="position" class="small" aria-live="polite"></p><p id="current-record-indicator" class="current-record-indicator"></p>
+      <ol id="record-list" class="queue-list" aria-label="Antrean record individual"></ol>
+      <div class="pagination"><button id="page-previous" type="button" aria-label="Halaman antrean sebelumnya">‹</button><span id="page-position" aria-live="polite"></span><button id="page-next" type="button" aria-label="Halaman antrean berikutnya">›</button><label for="page-size" class="sr-only">Record per halaman</label><select id="page-size" aria-label="Record per halaman"><option value="20">20 / hal</option><option value="50">50 / hal</option><option value="100">100 / hal</option></select></div>
+      <details class="queue-details"><summary>Komposisi pilot</summary><dl id="pilot-info" class="metadata-grid"></dl><details><summary>Data pilot teknis</summary><pre id="pilot-technical"></pre></details></details>
+      <details class="queue-details"><summary>Progres per kelas & issue</summary><p class="small">Kategori dapat bertumpang tindih. UNRESOLVED/REVISE belum resolved.</p><div id="progress-breakdown"></div></details>
+    </aside>
+    <section class="panel viewer-panel" aria-labelledby="viewer-heading">
+      <div class="viewer-heading"><div><p class="eyebrow" id="viewer-heading" tabindex="-1">Viewer anotasi sumber</p><h2 id="record-title">Pilih record</h2><p id="viewer-subtitle" class="small"></p></div><span id="record-status" class="status-badge pending">BELUM DIREVIEW</span></div>
+      <div class="viewer-controls"><label for="zoom">Zoom <output id="zoom-label" for="zoom">Fit ×1</output><input id="zoom" type="range" min="1" max="5" step="0.25" value="1"></label><button id="zoom-reset" type="button">Fit / reset</button><label><input id="show-bbox" type="checkbox" checked> Bbox asli</label><label><input id="show-polygon" type="checkbox" checked> Polygon asli</label><label><input id="show-proposal" type="checkbox"> Envelope usulan</label></div>
+      <p class="viewer-legend"><span class="legend-bbox">━ Bbox</span><span class="legend-polygon">━ Polygon</span><span class="legend-proposal">┄ Usulan, belum disetujui</span></p>
+      <div id="viewer" class="viewers"></div>
+      <details class="annotation-details"><summary id="annotation-summary">Anotasi sumber</summary><div id="annotation-list"></div></details>
+      <div class="viewer-footer"><button id="previous-center" type="button">← Record sebelumnya</button><span class="small">Navigasi tidak menyimpan atau memutuskan record.</span><button id="next-center" type="button">Record berikutnya →</button></div>
+    </section>
+    <aside class="panel review-panel" aria-labelledby="review-heading">
+      <div class="panel-heading"><h2 id="review-heading">Review record aktif</h2><span class="qa-only">QA ONLY</span></div>
+      <div class="reviewer-block"><label for="reviewer">Identitas reviewer</label><input id="reviewer" autocomplete="off" maxlength="128" placeholder="Nama / alias reviewer sebenarnya"><p class="small">Tidak diisi otomatis dan tidak disimpan ke disk.</p></div>
+      <section class="record-overview" aria-label="Ringkasan record"><dl id="record-summary" class="metadata-grid"></dl><div id="qa-issues" class="issue-list" aria-label="QA issues"></div></section>
+      <details class="technical-details"><summary>Metadata teknis lengkap</summary><pre id="metadata"></pre></details>
+      <form id="review-form" class="review-form">
+        <div class="form-scroll">
+          <p id="existing-review" class="small"></p>
+          <label for="decision">Keputusan eksplisit<select id="decision" required><option value="">Pilih secara eksplisit</option><option value="accept">ACCEPT</option><option value="revise">REVISE</option><option value="exclude">EXCLUDE</option><option value="unresolved">UNRESOLVED</option></select></label>
+          <label for="scope">Scope observasi<select id="scope"><option value="unresolved">Belum diputuskan</option><option value="lesion">Lesion / lesi</option><option value="leaf">Leaf / daun</option><option value="other">Other (kebijakan terpisah)</option><option value="not_applicable">Tidak berlaku</option></select></label>
+          <label for="reason">Alasan (wajib)<textarea id="reason" rows="2" required></textarea></label>
+          <label for="evidence">Evidence aktual (satu referensi per baris)<textarea id="evidence" rows="2" required placeholder="Artefak / ledger yang benar-benar direview"></textarea></label>
+          <button id="add-reference" type="button" class="secondary-button">Tambahkan referensi record ini</button>
+          <fieldset id="pair-fields"><legend>Hubungan sumber / ancestry</legend><label for="relationship">Hubungan yang didukung evidence<select id="relationship"><option value="unresolved">UNRESOLVED</option><option value="same_original">Same original</option><option value="same_session">Same acquisition session</option><option value="different_original">Different original</option><option value="visually_similar_only">Visually similar only</option></select></label><label for="group-id">Proposal group ID (tidak diterapkan)<input id="group-id" autocomplete="off"></label></fieldset>
+          <label id="negative-label" class="checkbox-label"><input id="negative" type="checkbox"> Saya secara eksplisit telah mereview gambar ini sebagai negatif untuk target relevan, bukan karena TXT kosong.</label>
+          <details><summary>Asesmen read-only gambar</summary><pre id="assessment"></pre></details>
+        </div>
+        <div class="form-footer"><button id="save" type="submit">Simpan record ini ke memori</button><p class="small">Timestamp hanya saat simpan. Record lain tidak ikut diputuskan.</p></div>
+      </form>
+      <div class="review-navigation"><button id="previous" type="button">← Sebelumnya</button><button id="next" type="button">Berikutnya →</button></div>
+      <label class="keyboard-toggle"><input id="keyboard-navigation" type="checkbox"> Aktifkan Alt+← / Alt+→ di luar input</label>
+    </aside>
+  </main>
+  <noscript>Dashboard memerlukan JavaScript lokal. Galeri statis ada di qa/index.html; tidak memerlukan internet.</noscript>
+  <script id="qa-payload" type="application/json">__AGRIGUARD_REVIEW_PAYLOAD__</script>
+  <script src="core.js"></script>
+  <script src="workspace.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

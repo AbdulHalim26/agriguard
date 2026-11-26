@@ -18,7 +18,24 @@ import {
   setVerification,
   type VerificationReport,
 } from '@/app/(app)/verifikasi/verification-actions'
-import { AI_STATUS_INFO, formatConfidence } from '@/lib/recommendations'
+import AdvisoryAssessment from './AdvisoryAssessment'
+import { INSURANCE_NOTICE, reportAdvisory, UNKNOWN_AFFECTED_AREA_LABEL } from '@/lib/reports/advisory'
+import { formatHectares } from '@/lib/reports/area'
+import {
+  PHOTO_EVIDENCE_DISCLAIMER,
+  captureSourceLabel,
+  formatWibTimestamp,
+  locationStatusLabel,
+} from '@/lib/reports/photo-evidence'
+
+function geofenceStatusLabel(status?: VerificationReport['geofence_status']): { label: string; tone: string } {
+  if (status === 'INSIDE') return { label: 'Di Dalam Batas Lahan', tone: 'bg-green-100 text-green-800' }
+  if (status === 'BOUNDARY') return { label: 'Di Tepi Batas Lahan', tone: 'bg-emerald-100 text-emerald-800' }
+  if (status === 'OUTSIDE') return { label: 'Di Luar Batas Lahan', tone: 'bg-red-100 text-red-800' }
+  if (status === 'INVALID_GEOMETRY') return { label: 'Geometri Lahan Tidak Valid', tone: 'bg-amber-100 text-amber-800' }
+  if (status === 'INVALID_POINT') return { label: 'Titik Koordinat Tidak Valid', tone: 'bg-red-100 text-red-800' }
+  return { label: 'Belum Diperiksa', tone: 'bg-slate-100 text-slate-700' }
+}
 
 type Filter = 'all' | 'pending' | 'done'
 
@@ -57,6 +74,7 @@ export default function ReportVerification() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [selected, setSelected] = useState<VerificationReport | null>(null)
+  const [photoTab, setPhotoTab] = useState<'original' | 'watermarked'>('watermarked')
   const [note, setNote] = useState('')
   const [acting, setActing] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -92,6 +110,7 @@ export default function ReportVerification() {
 
   const openModal = (report: VerificationReport) => {
     setSelected(report)
+    setPhotoTab(report.watermarked_photo_url ? 'watermarked' : 'original')
     setNote(report.verification_note ?? '')
     setActionError(null)
   }
@@ -100,22 +119,27 @@ export default function ReportVerification() {
     if (!selected) return
     setActing(true)
     setActionError(null)
-    const res = await setVerification({
-      reportId: selected.id,
-      isVerified,
-      note: note || null,
-    })
-    setActing(false)
+    try {
+      const res = await setVerification({
+        reportId: selected.id,
+        isVerified,
+        note: note || null,
+      })
 
-    if (res.error) {
-      setActionError(res.error)
-      return
+      if (res.error) {
+        setActionError(res.error)
+        return
+      }
+
+      setMessage(isVerified ? 'Laporan terverifikasi PPL/Dinas. Ini bukan persetujuan klaim.' : 'Laporan ditolak PPL/Dinas. Ini bukan keputusan penanggung asuransi.')
+      setSelected(null)
+      fetchReports()
+      setTimeout(() => setMessage(null), 3000)
+    } catch {
+      setActionError('Koneksi verifikasi terputus. Muat ulang daftar laporan untuk memeriksa status sebelum mencoba kembali.')
+    } finally {
+      setActing(false)
     }
-
-    setMessage(isVerified ? 'Laporan disetujui.' : 'Laporan ditolak.')
-    setSelected(null)
-    fetchReports()
-    setTimeout(() => setMessage(null), 3000)
   }
 
   return (
@@ -182,7 +206,6 @@ export default function ReportVerification() {
       ) : (
         <div className="space-y-3">
           {filtered.map((report) => {
-            const info = report.ai_status ? AI_STATUS_INFO[report.ai_status] : null
             return (
               <button
                 key={report.id}
@@ -208,13 +231,6 @@ export default function ReportVerification() {
                       <span className="font-semibold text-gray-900 truncate">
                         {report.lahan_name || 'Lahan tidak diketahui'}
                       </span>
-                      {info && (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.badgeClass}`}
-                        >
-                          {info.label}
-                        </span>
-                      )}
                     </div>
                     <p className="text-sm text-gray-600 mt-0.5">
                       {report.owner_name || 'Petani'} · {formatDateTime(report.server_created_at)}
@@ -223,12 +239,12 @@ export default function ReportVerification() {
                       {finalStatus(report) === 'verified' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                           <CheckCircle2 size={12} aria-hidden="true" />
-                          Disetujui
+                          Laporan Terverifikasi
                         </span>
                       ) : finalStatus(report) === 'rejected' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
                           <XCircle size={12} aria-hidden="true" />
-                          Ditolak
+                          Laporan Ditolak
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
@@ -236,12 +252,8 @@ export default function ReportVerification() {
                           Menunggu
                         </span>
                       )}
-                      {report.ai_confidence != null && info && (
-                        <span className="text-xs text-gray-500">
-                          AI {formatConfidence(report.ai_confidence)}
-                        </span>
-                      )}
                     </div>
+                    <div className="mt-3"><AdvisoryAssessment assessment={reportAdvisory(report)} compact /></div>
                   </div>
                 </div>
               </button>
@@ -259,7 +271,7 @@ export default function ReportVerification() {
           aria-label={finalStatus(selected) === 'pending' ? 'Verifikasi laporan' : 'Detail laporan'}
         >
           <div
-            className="bg-white rounded-2xl w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2 mb-3">
@@ -276,18 +288,111 @@ export default function ReportVerification() {
             </div>
 
             {selected.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={selected.photo_url}
-                alt="Foto laporan"
-                className="w-full h-44 object-cover rounded-lg"
-              />
+              <div className="space-y-2">
+                {selected.watermarked_photo_url && (
+                  <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoTab('watermarked')}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                        photoTab === 'watermarked' ? 'bg-green-600 text-white' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Salinan Watermark
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoTab('original')}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                        photoTab === 'original' ? 'bg-green-600 text-white' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Foto Asli
+                    </button>
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoTab === 'watermarked' && selected.watermarked_photo_url ? selected.watermarked_photo_url : selected.photo_url}
+                  alt={photoTab === 'watermarked' && selected.watermarked_photo_url ? 'Salinan foto dengan watermark GPS' : 'Foto asli laporan'}
+                  className="w-full h-56 object-contain rounded-lg bg-slate-950"
+                />
+              </div>
             ) : (
               <div className="w-full h-44 bg-gray-100 rounded-lg flex flex-col items-center justify-center text-gray-400">
                 <ImageOff className="w-8 h-8 mb-2" aria-hidden="true" />
                 <span className="text-xs">Tidak ada foto tersedia</span>
               </div>
             )}
+
+            {/* Panel Pemeriksaan Bukti Foto & Lokasi (PPL/Dinas) */}
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <p className="font-semibold text-slate-900">Pemeriksaan Bukti Foto & Lokasi</p>
+                <span className={`px-2 py-0.5 rounded-full font-medium ${geofenceStatusLabel(selected.geofence_status).tone}`}>
+                  {geofenceStatusLabel(selected.geofence_status).label}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 font-medium">
+                  {captureSourceLabel(selected.photo_evidence?.capture_source)}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700">
+                  {locationStatusLabel(selected.photo_evidence?.location_status)}
+                </span>
+                {selected.photo_evidence?.submitted_offline && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                    Dikirim Offline
+                  </span>
+                )}
+              </div>
+              <div className="grid sm:grid-cols-2 gap-1.5 text-[11px] text-slate-700">
+                <div>
+                  <span className="text-slate-500 block">Koordinat Laporan</span>
+                  <span className="font-mono font-medium">
+                    {Number(selected.latitude).toFixed(6)}, {Number(selected.longitude).toFixed(6)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Akurasi GPS saat Capture</span>
+                  <span className="font-mono font-medium">
+                    {selected.photo_evidence?.gps_snapshot?.accuracy_m != null
+                      ? `±${Math.round(selected.photo_evidence.gps_snapshot.accuracy_m)} m`
+                      : 'Tidak tersedia'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Waktu Foto (Perangkat)</span>
+                  <span className="font-mono">
+                    {formatWibTimestamp(selected.photo_evidence?.device_captured_at ?? selected.client_created_at)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Waktu Diterima Server</span>
+                  <span className="font-mono">
+                    {formatWibTimestamp(selected.photo_evidence?.server_received_at ?? selected.server_created_at)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">SHA-256 Foto Asli</span>
+                  <span className="font-mono break-all">
+                    {(selected.photo_evidence?.original_photo_sha256 ?? selected.photo_hash ?? 'Tidak tersedia').slice(0, 24)}
+                    {(selected.photo_evidence?.original_photo_sha256 ?? selected.photo_hash) ? '…' : ''}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">SHA-256 Salinan Watermark</span>
+                  <span className="font-mono break-all">
+                    {selected.photo_evidence?.watermarked_photo_sha256
+                      ? `${selected.photo_evidence.watermarked_photo_sha256.slice(0, 24)}…`
+                      : 'Tidak tersedia'}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                {selected.photo_evidence?.authenticity_note ?? PHOTO_EVIDENCE_DISCLAIMER}
+              </p>
+            </div>
 
             <div className="mt-4 space-y-2.5 text-sm">
               <div>
@@ -305,25 +410,12 @@ export default function ReportVerification() {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Hasil AI</p>
-                {selected.ai_status ? (
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${AI_STATUS_INFO[selected.ai_status].badgeClass}`}
-                  >
-                    {AI_STATUS_INFO[selected.ai_status].label}
-                    {selected.ai_confidence != null &&
-                      ` · ${formatConfidence(selected.ai_confidence)}`}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                    Manual
-                  </span>
-                )}
-                {selected.ai_damage_pct != null && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Kerusakan {Math.round(selected.ai_damage_pct)}%
-                  </p>
-                )}
+                <AdvisoryAssessment assessment={reportAdvisory(selected)} technical />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Luas Terdaftar Lahan (bukan luas rusak)</p>
+                <p>{formatHectares(selected.lahan_area_hectares)}</p>
+                <p className="text-xs text-slate-600">{UNKNOWN_AFFECTED_AREA_LABEL}.</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Waktu Laporan</p>
@@ -333,17 +425,17 @@ export default function ReportVerification() {
               </div>
               {finalStatus(selected) !== 'pending' && (
                 <div>
-                  <p className="text-xs text-gray-500">Status Final</p>
+                  <p className="text-xs text-gray-500">Verifikasi Laporan Final</p>
                   {finalStatus(selected) === 'verified' ? (
                     <p className="font-medium text-green-700">
                       <CheckCircle2 size={14} className="inline mr-1" aria-hidden="true" />
-                      Disetujui{selected.verifier_name ? ` oleh ${selected.verifier_name}` : ''} ·{' '}
+                      Laporan Terverifikasi{selected.verifier_name ? ` oleh ${selected.verifier_name}` : ''} ·{' '}
                       {formatDateTime(selected.verified_at)}
                     </p>
                   ) : (
                     <p className="font-medium text-red-700">
                       <XCircle size={14} className="inline mr-1" aria-hidden="true" />
-                      Ditolak{selected.verifier_name ? ` oleh ${selected.verifier_name}` : ''} ·{' '}
+                      Laporan Ditolak{selected.verifier_name ? ` oleh ${selected.verifier_name}` : ''} ·{' '}
                       {formatDateTime(selected.verified_at)}
                     </p>
                   )}
@@ -351,6 +443,7 @@ export default function ReportVerification() {
               )}
             </div>
 
+            <p className="text-xs text-slate-600 mt-4">{INSURANCE_NOTICE}</p>
             {finalStatus(selected) === 'pending' ? (
               <>
                 <label className="block mt-4">
@@ -385,7 +478,7 @@ export default function ReportVerification() {
                     ) : (
                       <XCircle size={16} aria-hidden="true" />
                     )}
-                    Tolak
+                    Tolak Laporan
                   </button>
                   <button
                     onClick={() => handleAction(true)}
@@ -397,7 +490,7 @@ export default function ReportVerification() {
                     ) : (
                       <ShieldCheck size={16} aria-hidden="true" />
                     )}
-                    Setujui
+                    Verifikasi Laporan
                   </button>
                 </div>
               </>
@@ -411,7 +504,7 @@ export default function ReportVerification() {
                   {selected.verification_note || 'Tidak ada catatan'}
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
-                  Keputusan final — aksi verifikasi tidak tersedia lagi untuk laporan ini.
+                  Verifikasi laporan final — aksi tidak tersedia lagi untuk laporan ini. Keputusan klaim tetap terpisah pada penanggung.
                 </p>
               </div>
             )}

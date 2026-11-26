@@ -54,7 +54,11 @@ ai-service/model/*
 ai-service/__pycache__/
 ai-service/*.pyc
 ai-service/.venv/
+ai-service/.venv-ml-m1/
 ai-service/training/__pycache__/
+ai-service/detection/__pycache__/
+ai-service/tests/__pycache__/
+ai-service/training/yolo/__pycache__/
 ai-service/training/sources.local.json
 !ai-service/model/model_v2.onnx
 !ai-service/model/model_v2.metadata.json
@@ -62,3 +66,6 @@ training-data/
 training-artifacts/
 .env
 .env*.local
+
+# Private, locally generated staging preparation bundles (never production data).
+.staging/

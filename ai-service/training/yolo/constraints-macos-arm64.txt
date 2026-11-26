@@ -1,0 +1,8 @@
+# REVIEWED CANDIDATE, NOT INSTALLED/EXECUTED by PHASE 1B.0.1.
+# Python 3.12 arm64, macOS >=14 for this torch line. Install only in a NEW env
+# after approval, inspect solver output, run import/MPS/checkpoint checks, then lock.
+# Official torchvision matrix pairs torch 2.11 with torchvision 0.26.
+torch==2.11.0
+torchvision==0.26.0
+# Official software release observed 2026-11-14; distinct from asset tag v8.4.0.
+ultralytics==8.4.212

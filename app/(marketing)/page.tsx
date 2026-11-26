@@ -32,7 +32,7 @@ const HOW_STEPS = [
   {
     icon: Cpu,
     title: 'AI Menganalisis',
-    description: 'Model AI memeriksa foto dan memperkirakan tingkat kerusakan.',
+    description: 'Model AI memberi indikasi visual awal pada foto, bukan ukuran kerugian lahan.',
   },
   {
     icon: ClipboardList,
@@ -42,16 +42,16 @@ const HOW_STEPS = [
   {
     icon: Sprout,
     title: 'Tindakan',
-    description: 'Ikuti rekomendasi penanganan sesuai tingkat keparahan lahan.',
+    description: 'Minta peninjauan PPL/Dinas dan ikuti arahan berdasarkan bukti lapangan.',
   },
 ]
 
 const AI_STEPS = [
   { icon: Camera, title: 'Foto Lahan', description: 'Gambar padi atau sawah dari jarak jelas.' },
   { icon: Cpu, title: 'EfficientNet-B0', description: 'Model AI menganalisis pola visual pada foto.' },
-  { icon: ScanSearch, title: 'Klasifikasi Kerusakan', description: 'Kondisi dibagi menjadi aman, rusak ringan, atau rusak berat.' },
-  { icon: Gauge, title: 'Estimasi Kerusakan', description: 'Skor perkiraan kerusakan berdasarkan hasil klasifikasi.' },
-  { icon: Lightbulb, title: 'Rekomendasi', description: 'Saran tindakan yang bisa langsung dilakukan.' },
+  { icon: ScanSearch, title: 'Indikasi Visual', description: 'Status foto menunjukkan indikasi awal, bukan kepastian kondisi seluruh lahan.' },
+  { icon: Gauge, title: 'Keyakinan Model', description: 'Skor klasifikasi bukan persentase kerusakan, akurasi, atau peluang klaim disetujui.' },
+  { icon: Lightbulb, title: 'Perlu Verifikasi', description: 'PPL/Dinas meninjau bukti; keputusan klaim tetap pada penanggung.' },
 ]
 
 const TRUST = [
@@ -99,11 +99,11 @@ export default async function BerandaPage() {
                 <Leaf size={13} aria-hidden="true" /> Teknologi Cerdas untuk Sawah
               </span>
               <h1 className={`text-3xl sm:text-4xl lg:text-[2.75rem] font-bold leading-tight mb-4 ${NAVY}`}>
-                Deteksi Kerusakan Lahan Padi Lebih Cepat dengan AI
+                Dokumentasikan Indikasi Kerusakan Padi dengan AI
               </h1>
               <p className="text-base sm:text-lg text-[#2E7D32] mb-8">
-                Foto sawah Anda dan biarkan AgriGuard menganalisis tingkat kerusakan, memberi skor,
-                serta rekomendasi tindakan — bahkan saat sinyal terbatas.
+                Foto padi membantu penilaian visual awal dan peninjauan PPL/Dinas. Luas kerusakan
+                dan kelayakan klaim tidak ditentukan AI. Bukti dapat diantrekan saat offline.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link

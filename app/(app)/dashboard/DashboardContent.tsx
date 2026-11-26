@@ -28,8 +28,8 @@ export default function DashboardContent({ userName, userId, demoMode, role }: D
         <div>
           <h4 className="font-medium text-blue-800 mb-1">Mode Demo</h4>
           <p className="text-blue-700 text-sm">
-            Aplikasi berjalan dalam mode demo dengan data simulasi. Data cuaca menggunakan fallback mock
-            jika API key tidak dikonfigurasi. Login dengan OTP: <code className="bg-white px-1.5 py-0.5 rounded text-xs font-mono">123456</code>
+            Data contoh bukan kondisi nyata. Simulasi EWS hanya dipilih secara eksplisit di lingkungan nonproduction;
+            data cuaca yang tidak tersedia tidak dianggap aman. Login tetap mengikuti autentikasi yang dikonfigurasi pengelola.
           </p>
         </div>
       </div>
@@ -57,7 +57,7 @@ export default function DashboardContent({ userName, userId, demoMode, role }: D
       {
         href: '/verifikasi?tab=rekap',
         label: 'Rekap PDF',
-        description: 'Rekap luas terdampak per wilayah',
+        description: 'Rekap laporan dan luas terdaftar unik',
         icon: Printer,
         iconBg: 'bg-orange-100',
         iconColor: 'text-orange-600',

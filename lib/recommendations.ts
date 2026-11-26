@@ -9,31 +9,31 @@ export interface AiStatusInfo {
 
 export const AI_STATUS_INFO: Record<AiStatus, AiStatusInfo> = {
   aman: {
-    label: 'Aman',
-    badgeClass: 'bg-green-100 text-green-700',
-    dotClass: 'bg-green-500',
+    label: 'Tidak Tampak Kerusakan (Foto)',
+    badgeClass: 'bg-sky-100 text-sky-800',
+    dotClass: 'bg-sky-500',
     recommendation:
-      'Tanaman tampak sehat. Teruskan pemantauan rutin dan pastikan drainase lahan lancar.',
+      'Hasil awal pada foto bukan jaminan tanaman sehat atau bebas banjir. Tetap dokumentasikan kondisi dan minta peninjauan PPL/Dinas.',
   },
   rusak_ringan: {
-    label: 'Rusak Ringan',
+    label: 'Indikasi Kerusakan Ringan',
     badgeClass: 'bg-yellow-100 text-yellow-700',
     dotClass: 'bg-yellow-500',
     recommendation:
-      'Kerusakan ringan terdeteksi. Bersihkan lumpur/genangan, perbaiki drainase, dan beri pemupukan pemulihan. Laporkan agar dipantau PPL.',
+      'Dokumentasikan indikasi pada tanaman dan konteks kejadian. Minta peninjauan PPL/Dinas sebelum menyimpulkan penyebab atau tindakan penanganan.',
   },
   rusak_berat: {
-    label: 'Rusak Berat',
+    label: 'Indikasi Kerusakan Berat',
     badgeClass: 'bg-red-100 text-red-700',
     dotClass: 'bg-red-500',
     recommendation:
-      'Kerusakan parah terdeteksi. Segera laporkan untuk verifikasi PPL dan pengajuan klaim AUTP. Jangan panen dini sebelum diverifikasi.',
+      'Kirim bukti untuk ditinjau PPL/Dinas. Indikasi visual ini belum menentukan luas kerusakan, penyebab banjir, atau kelayakan klaim AUTP.',
   },
 }
 
 export const AI_STATUS_LIST: AiStatus[] = ['aman', 'rusak_ringan', 'rusak_berat']
 
 export function formatConfidence(confidence: number | null | undefined): string {
-  if (confidence == null) return '—'
+  if (confidence == null || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) return '—'
   return `${Math.round(confidence * 100)}%`
 }

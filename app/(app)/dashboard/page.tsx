@@ -41,14 +41,12 @@ export default async function DashboardPage() {
     redirect('/onboarding')
   }
 
-  const demoMode = (process.env.OTP_MODE || 'mock') === 'mock'
-
   return (
     <div className="max-w-5xl mx-auto">
       <DashboardContent
         userName={fullName}
         userId={userId}
-        demoMode={demoMode}
+        demoMode={false}
         role={role}
       />
     </div>

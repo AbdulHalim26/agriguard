@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { analyzeImage, AiRejectedError } from '@/lib/ai'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { calculateSha256 } from '@/lib/geo'
+import { isSameOriginRequest } from '@/lib/auth/origin'
 
 export const maxDuration = 90
 // Sisakan waktu untuk auth/upload dan pengiriman respons sebelum timeout klien.
@@ -29,6 +32,9 @@ function consumeQuota(userId: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: 'Origin tidak diizinkan.' }, { status: 403 })
+  }
   const supabase = await createClient()
   const {
     data: { user },
@@ -83,7 +89,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await analyzeImage(file, SCAN_AI_TIMEOUT_MS)
-    return NextResponse.json(result)
+    const admin = createAdminClient()
+    const { data: receipt, error } = await admin.from('ai_analyses').insert({
+      user_id: user.id, photo_hash: await calculateSha256(file),
+      status: result.status, confidence: result.confidence, damage_pct: result.damage_pct,
+    }).select('id').single()
+    if (error || !receipt) throw new Error('Hasil AI belum dapat disimpan secara aman. Coba lagi atau gunakan penilaian manual.')
+    return NextResponse.json({ ...result, analysis_id: receipt.id })
   } catch (error) {
     console.error('[ai/analyze] gagal:', error)
     const message = error instanceof Error ? error.message : 'Gagal menganalisis gambar'

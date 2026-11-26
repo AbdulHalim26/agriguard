@@ -28,7 +28,7 @@ const FEATURES = [
     icon: Camera,
     title: 'Deteksi Kerusakan AI',
     description:
-      'Cukup foto sawah — AI menilai tingkat kerusakan dan membantu menentukan langkah penanganan.',
+      'Foto padi menghasilkan indikasi visual awal untuk ditinjau PPL/Dinas, bukan ukuran kerusakan seluruh lahan.',
   },
   {
     icon: WifiOff,
@@ -40,15 +40,15 @@ const FEATURES = [
     icon: ShieldCheck,
     title: 'Verifikasi PPL & Dinas',
     description:
-      'PPL dan Dinas meninjau laporan petani, memberi catatan, dan merekap luas terdampak per wilayah.',
+      'PPL dan Dinas meninjau laporan, memberi catatan, dan merekap luas terdaftar unik. Luas terdampak memerlukan pengukuran tersendiri.',
   },
 ]
 
 const AI_POINTS = [
-  'Klasifikasi otomatis: Aman, Rusak Ringan, Rusak Berat',
-  'Skor keyakinan (confidence) dan persentase kerusakan',
-  'Rekomendasi tindakan sesuai tingkat keparahan',
-  'Hasil dapat diverifikasi dan dikoreksi oleh PPL/Dinas',
+  'Indikasi visual pada foto, bukan jaminan lahan sehat atau bebas banjir',
+  'Keyakinan model terpisah dari kerusakan terukur',
+  'REVIEW_REQUIRED — penilaian awal belum terkalibrasi',
+  'Verifikasi laporan PPL/Dinas terpisah dari keputusan klaim penanggung',
 ]
 
 export default function FiturPage() {
@@ -133,19 +133,19 @@ export default function FiturPage() {
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between bg-[#F8F9FA] rounded-xl px-4 py-3">
-                <span className="text-sm text-gray-600">Tingkat kerusakan</span>
-                <span className="text-sm font-semibold text-[#ED6C02]">Rusak Ringan</span>
+                <span className="text-sm text-gray-600">Indikasi visual (contoh)</span>
+                <span className="text-sm font-semibold text-[#ED6C02]">Indikasi Ringan</span>
               </div>
               <div className="flex items-center justify-between bg-[#F8F9FA] rounded-xl px-4 py-3">
-                <span className="text-sm text-gray-600">Keyakinan model</span>
+                <span className="text-sm text-gray-600">Keyakinan model (ilustrasi)</span>
                 <span className={`text-sm font-semibold ${NAVY}`}>92%</span>
               </div>
               <div className="flex items-center justify-between bg-[#F8F9FA] rounded-xl px-4 py-3">
-                <span className="text-sm text-gray-600">Rekomendasi</span>
-                <span className="text-sm font-semibold text-[#2E7D32]">Pantau &amp; atur drainase</span>
+                <span className="text-sm text-gray-600">Peninjauan</span>
+                <span className="text-sm font-semibold text-amber-900">REVIEW_REQUIRED</span>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-4">Angka ilustratif. Nilai aktual mengikuti hasil model.</p>
+            <p className="text-xs text-gray-500 mt-4">Angka ilustratif, bukan hasil evaluasi akurasi atau persentase kerusakan. Luas terdampak belum terverifikasi.</p>
           </div>
         </div>
       </section>

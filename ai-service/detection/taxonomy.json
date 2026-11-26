@@ -1,0 +1,12 @@
+{
+  "schema_version": "rice_detection_v1",
+  "classes": [
+    "leaf_blast",
+    "bacterial_leaf_blight",
+    "brown_spot",
+    "sheath_blight",
+    "tungro_symptom",
+    "leaf_folder_damage"
+  ],
+  "annotation_levels": ["lesion", "leaf"]
+}

@@ -2,11 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { AiStatus } from '@/lib/recommendations'
+import type { EvidenceSource } from '@/lib/reports/evidence'
+import { registeredArea } from '@/lib/reports/area'
 
 export interface PetaLahan {
   id: string
   name: string
-  area_hectares: number
+  area_hectares: number | null
   polygon: number[][]
   owner_name: string | null
 }
@@ -19,10 +21,13 @@ export interface PetaReport {
   ai_status: AiStatus | null
   ai_confidence: number | null
   ai_damage_pct: number | null
+  evidence_source: EvidenceSource
   latitude: number
   longitude: number
   server_created_at: string
   is_verified: boolean
+  verified_at: string | null
+  ai_analysis_id?: string | null
   photo_url: string | null
 }
 
@@ -68,7 +73,7 @@ export async function getPetaData(): Promise<{
   const lahan: PetaLahan[] = (lahanRows || []).map((row: any) => ({
     id: row.id,
     name: row.name,
-    area_hectares: Number(row.area_hectares),
+    area_hectares: registeredArea(row.area_hectares),
     polygon: row.polygon,
     owner_name: row.profiles?.full_name ?? null,
   }))
@@ -91,10 +96,13 @@ export async function getPetaData(): Promise<{
       ai_status: row.ai_status ?? null,
       ai_confidence: row.ai_confidence != null ? Number(row.ai_confidence) : null,
       ai_damage_pct: row.ai_damage_pct != null ? Number(row.ai_damage_pct) : null,
+      evidence_source: row.evidence_source || 'legacy_unverified',
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
       server_created_at: row.server_created_at,
       is_verified: row.is_verified,
+      verified_at: row.verified_at ?? null,
+      ai_analysis_id: row.ai_analysis_id ?? null,
       photo_url: photoUrl,
     })
   }

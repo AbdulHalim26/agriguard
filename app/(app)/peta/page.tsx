@@ -12,8 +12,12 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { getPetaData, type PetaData, type PetaLahan, type PetaReport } from './actions'
-import { AI_STATUS_INFO, formatConfidence, type AiStatus } from '@/lib/recommendations'
+import type { AiStatus } from '@/lib/recommendations'
 import MapSkeleton from '@/components/map/MapSkeleton'
+import { evidenceLabel } from '@/lib/reports/evidence'
+import AdvisoryAssessment from '@/components/features/AdvisoryAssessment'
+import { INSURANCE_NOTICE, reportAdvisory, reportVerification, UNKNOWN_AFFECTED_AREA_LABEL } from '@/lib/reports/advisory'
+import { formatHectares } from '@/lib/reports/area'
 
 const PetaMap = dynamic(() => import('./PetaMap'), {
   ssr: false,
@@ -97,7 +101,7 @@ export default function PetaPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Peta Lahan & Laporan</h1>
         <p className="text-gray-500 mt-1">
-          Warna area &amp; pin mengikuti hasil AI terbaru. Klik area lahan atau pin untuk detail.
+          Area menunjukkan batas lahan terdaftar. Pin menunjukkan indikasi pada foto laporan, bukan ukuran kerusakan seluruh bidang. Semua penilaian awal perlu verifikasi.
         </p>
       </div>
 
@@ -128,26 +132,26 @@ export default function PetaPage() {
           />
           <div className="p-4 border-t border-gray-200 flex flex-wrap items-center gap-4 text-xs text-gray-600">
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 bg-green-600 rounded-full" aria-hidden="true" />
-              Aman
+              <span className="w-3 h-3 bg-sky-600 rounded-full" aria-hidden="true" />
+              Tidak Tampak Kerusakan (Foto)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 bg-amber-600 rounded-full" aria-hidden="true" />
-              Rusak Ringan
+              Indikasi Ringan (Foto)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 bg-red-600 rounded-full" aria-hidden="true" />
-              Rusak Berat
+              Indikasi Berat (Foto)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 bg-gray-500 rounded-full" aria-hidden="true" />
-              Manual
+              Belum ada penilaian
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 bg-[#2E7D32] rounded-full" aria-hidden="true" />
-              Belum ada laporan
+              <span className="w-3 h-3 bg-slate-500 rounded-full" aria-hidden="true" />
+              Batas lahan, bukan luas terdampak
             </span>
-            <span className="ml-auto">{data.reports.length} laporan · {data.lahan.length} lahan</span>
+            <span className="ml-auto">Termuat: {data.reports.length} laporan (maks. 200 terbaru) · {data.lahan.length} lahan</span>
           </div>
         </div>
       ) : (
@@ -186,6 +190,7 @@ export default function PetaPage() {
             {selectedReport ? (
               <>
                 <PhotoWithFallback src={selectedReport.photo_url} alt="Foto laporan" />
+                <p className="text-xs text-gray-500 mt-2">Sumber: {evidenceLabel(selectedReport.evidence_source)}</p>
 
                 <div className="mt-4 space-y-2.5 text-sm">
                   <div>
@@ -211,40 +216,23 @@ export default function PetaPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Hasil AI</p>
-                    {selectedReport.ai_status ? (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${AI_STATUS_INFO[selectedReport.ai_status].badgeClass}`}
-                      >
-                        {AI_STATUS_INFO[selectedReport.ai_status].label}
-                        {selectedReport.ai_confidence != null &&
-                          ` · ${formatConfidence(selectedReport.ai_confidence)}`}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                        Manual
-                      </span>
-                    )}
-                    {selectedReport.ai_damage_pct != null && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Kerusakan {Math.round(selectedReport.ai_damage_pct)}%
-                      </p>
-                    )}
+                    <AdvisoryAssessment assessment={reportAdvisory(selectedReport)} technical />
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Verifikasi</p>
                     {selectedReport.is_verified ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                         <ShieldCheck size={14} aria-hidden="true" />
-                        Tervalidasi
+                        Laporan Terverifikasi
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
                         <AlertTriangle size={14} aria-hidden="true" />
-                        Menunggu verifikasi
+                        {reportVerification(selectedReport).label}
                       </span>
                     )}
                   </div>
+                  <p className="text-xs text-slate-600">{INSURANCE_NOTICE}</p>
                 </div>
               </>
             ) : selectedLahan ? (
@@ -254,23 +242,20 @@ export default function PetaPage() {
                   <p className="font-medium text-gray-900">{selectedLahan.lahan.name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Pemilik</p>
+                  <p className="text-xs text-gray-500">Pendaftar Lahan</p>
                   <p className="font-medium text-gray-900">{selectedLahan.lahan.owner_name || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Luas</p>
+                  <p className="text-xs text-gray-500">Luas Terdaftar (bukan luas rusak)</p>
                   <p className="font-medium text-gray-900">
-                    {selectedLahan.lahan.area_hectares.toFixed(2)} Ha
+                    {formatHectares(selectedLahan.lahan.area_hectares)}
                   </p>
+                  <p className="text-xs text-slate-600">{UNKNOWN_AFFECTED_AREA_LABEL}.</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Status AI Terbaru</p>
-                  {selectedLahan.status ? (
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${AI_STATUS_INFO[selectedLahan.status].badgeClass}`}
-                    >
-                      {AI_STATUS_INFO[selectedLahan.status].label}
-                    </span>
+                  <p className="text-xs text-gray-500">Penilaian pada Laporan Terbaru</p>
+                  {data?.reports.find((r) => r.lahan_id === selectedLahan.lahan.id) ? (
+                    <AdvisoryAssessment assessment={reportAdvisory(data.reports.find((r) => r.lahan_id === selectedLahan.lahan.id)!)} compact />
                   ) : (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
                       Belum ada laporan
@@ -278,7 +263,7 @@ export default function PetaPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Jumlah Laporan</p>
+                  <p className="text-xs text-gray-500">Jumlah Laporan Termuat</p>
                   <p className="font-medium text-gray-900">
                     {data?.reports.filter((r) => r.lahan_id === selectedLahan.lahan.id).length ?? 0}
                   </p>

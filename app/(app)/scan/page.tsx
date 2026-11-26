@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
@@ -17,11 +17,22 @@ import {
   WifiOff,
   Clock,
 } from 'lucide-react'
-import { compressImage, validateGeofence, type Polygon } from '@/lib/geo'
+import { calculateSha256, validateGeofence, type Polygon } from '@/lib/geo'
+import {
+  buildWatermarkLines,
+  captureSourceLabel,
+  createWatermarkedCopy,
+  formatWibTimestamp,
+  locationStatusLabel,
+  PHOTO_EVIDENCE_DISCLAIMER,
+  PHOTO_EVIDENCE_VERSION,
+  type CaptureSource,
+  type ClientCaptureMetadata,
+  type LocationStatus,
+} from '@/lib/reports/photo-evidence'
 import {
   AI_STATUS_INFO,
   AI_STATUS_LIST,
-  formatConfidence,
   type AiStatus,
 } from '@/lib/recommendations'
 import { submitReport } from '@/app/(app)/laporan/actions'
@@ -35,31 +46,58 @@ import {
   useOfflineStatus,
 } from '@/lib/offline/status'
 import { useCurrentUserId } from '@/lib/offline/use-current-user'
+import { fieldCacheKey } from '@/lib/offline/identity'
 import type { GeoCoords } from './ScanMap'
 import PhotoGuide from './PhotoGuide'
 import ScanTerbaru from './ScanTerbaru'
 import MapSkeleton from '@/components/map/MapSkeleton'
+import DetectionOverlay, { DetectionPanel } from '@/components/features/DetectionOverlay'
+import { detectionResponseSchema, type DetectionResponse } from '@/lib/detection'
+import AdvisoryAssessment from '@/components/features/AdvisoryAssessment'
+import AnalysisFailureActions from '@/components/features/AnalysisFailureActions'
+import { advisoryAssessment, submissionEvidence } from '@/lib/reports/advisory'
+import { formatHectares, registeredArea } from '@/lib/reports/area'
+import { validatePolygon } from '@/lib/land/geometry'
 
-const ScanMap = dynamic(() => import('./ScanMap'), {
-  ssr: false,
-  loading: () => <MapSkeleton className="h-56" />,
-})
+const OfflineMapFallback = () => (
+  <div className="h-56 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center p-4 text-center text-sm text-gray-600">
+    Peta tidak tersedia saat offline. Koordinat GPS tetap tersimpan bersama laporan.
+  </div>
+)
+
+const ScanMap = dynamic(
+  () => import('./ScanMap').catch(() => ({ default: OfflineMapFallback })),
+  {
+    ssr: false,
+    loading: () => <MapSkeleton className="h-56" />,
+  }
+)
 
 const DEFAULT_CENTER: [number, number] = [-6.312, 107.285]
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
-const LAHAN_CACHE_KEY = 'agriguard-lahan-cache'
 const SCAN_TIMEOUT_MS = 90_000
 
 interface AiResult {
   status: AiStatus
   confidence: number
   damage_pct: number
+  analysis_id: string
 }
 
 interface PhotoState {
   blob: Blob
   previewUrl: string
   name: string
+  originalSha256: string
+  captureSource: CaptureSource
+  deviceCapturedAt: string
+}
+
+interface GpsSnapshot {
+  latitude: number
+  longitude: number
+  accuracy_m: number | null
+  captured_at: string
 }
 
 export default function ScanPage() {
@@ -78,6 +116,10 @@ export default function ScanPage() {
   const analysisControllerRef = useRef<AbortController | null>(null)
   const photoVersionRef = useRef(0)
   const [aiResult, setAiResult] = useState<AiResult | null>(null)
+  const [yoloEnabled, setYoloEnabled] = useState(false)
+  const [detectionResult, setDetectionResult] = useState<DetectionResponse | null>(null)
+  const [detectionLoading, setDetectionLoading] = useState(false)
+  const [detectionError, setDetectionError] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiRetake, setAiRetake] = useState(false)
   const [aiPending, setAiPending] = useState(false)
@@ -90,6 +132,10 @@ export default function ScanPage() {
   const [selectedLahanId, setSelectedLahanId] = useState('')
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [gpsSnapshot, setGpsSnapshot] = useState<GpsSnapshot | null>(null)
+  const [locationStatus, setLocationStatus] = useState<LocationStatus>('gps_unavailable_unverified')
+  const [watermarked, setWatermarked] = useState<{ blob: Blob; previewUrl: string; sha256: string; lines: string[] } | null>(null)
+  const [previewTab, setPreviewTab] = useState<'yolo' | 'watermarked' | 'original'>('watermarked')
   const [locating, setLocating] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
@@ -98,18 +144,72 @@ export default function ScanPage() {
   const [savedOffline, setSavedOffline] = useState(false)
   const offline = useOfflineStatus()
 
+  useEffect(() => {
+    let active = true
+    // Preload ScanMap chunk while online so selecting a photo offline never fails.
+    import('./ScanMap').catch(() => {})
+    fetch('/api/ai/detect', { cache: 'no-store' }).then((res) => res.ok ? res.json() : null)
+      .then((config) => { if (active) setYoloEnabled(config?.enabled === true) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    setDetectionResult(null)
+    setDetectionError(null)
+    setDetectionLoading(false)
+    if (!yoloEnabled || !photo || offline) return
+    const controller = new AbortController()
+    let active = true
+    const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS)
+    setDetectionLoading(true)
+    const form = new FormData()
+    form.append('image', photo.blob, photo.name)
+    fetch('/api/ai/detect', { method: 'POST', body: form, signal: controller.signal }).then(async (response) => {
+      const body = await response.json()
+      if (!active) return
+      if (!response.ok) {
+        setDetectionError(response.status === 503
+          ? 'Detektor YOLO belum tersedia. Klasifikasi foto awal tetap terpisah di bawah.'
+          : response.status === 401 || response.status === 403
+            ? 'Sesi deteksi perlu diperbarui. Silakan masuk kembali.'
+            : response.status === 429
+              ? 'Batas deteksi hari ini tercapai. Pelaporan existing tetap tersedia.'
+              : 'Deteksi belum berhasil. Foto tetap tersedia; coba lagi saat layanan siap.')
+        return
+      }
+      const parsed = detectionResponseSchema.parse(body)
+      setDetectionResult(parsed)
+      setPreviewTab('yolo')
+    }).catch(() => {
+      if (active) setDetectionError(controller.signal.aborted
+        ? 'Deteksi melewati 90 detik. Foto tetap tersedia; klasifikasi foto diproses terpisah.'
+        : 'Koneksi deteksi gagal atau responsnya tidak valid. Klasifikasi foto tetap terpisah.')
+    }).finally(() => {
+      window.clearTimeout(timer)
+      if (active) setDetectionLoading(false)
+    })
+    return () => { active = false; controller.abort(); window.clearTimeout(timer) }
+  }, [photo, yoloEnabled, offline])
+
   const userId = useCurrentUserId()
+  const currentUserRef = useRef(userId)
+  currentUserRef.current = userId
+  const lahanLoadVersion = useRef(0)
 
   const loadLahan = useCallback(async () => {
+    const version = ++lahanLoadVersion.current
+    setLahan([])
+    if (!userId) { setLahanLoading(false); return }
     setLahanLoading(true)
     setLahanError(null)
     try {
-      const res = await listMyLahan()
+      const res = await listMyLahan(userId)
+      if (version !== lahanLoadVersion.current || currentUserRef.current !== userId) return
       if (res.error) throw new Error(res.error)
       setLahan(res.data || [])
       // Cache lahan terakhir agar form tetap bisa dipakai saat offline.
       try {
-        window.localStorage.setItem(LAHAN_CACHE_KEY, JSON.stringify(res.data || []))
+        window.localStorage.setItem(fieldCacheKey(userId), JSON.stringify(res.data || []))
       } catch {
         // ignore
       }
@@ -119,10 +219,11 @@ export default function ScanPage() {
         autoSync()
       }
     } catch (err) {
+      if (version !== lahanLoadVersion.current || currentUserRef.current !== userId) return
       markOffline()
       let cached: LahanWithPolygon[] = []
       try {
-        const raw = window.localStorage.getItem(LAHAN_CACHE_KEY)
+        const raw = window.localStorage.getItem(fieldCacheKey(userId))
         if (raw) cached = JSON.parse(raw) as LahanWithPolygon[]
       } catch {
         // ignore
@@ -134,9 +235,9 @@ export default function ScanPage() {
         )
       }
     } finally {
-      setLahanLoading(false)
+      if (version === lahanLoadVersion.current) setLahanLoading(false)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     loadLahan()
@@ -148,6 +249,12 @@ export default function ScanPage() {
     }
   }, [photo])
 
+  useEffect(() => {
+    return () => {
+      if (watermarked) URL.revokeObjectURL(watermarked.previewUrl)
+    }
+  }, [watermarked])
+
   const cancelAnalysis = useCallback(() => {
     photoVersionRef.current += 1
     const controller = analysisControllerRef.current
@@ -156,6 +263,21 @@ export default function ScanPage() {
   }, [])
 
   useEffect(() => cancelAnalysis, [cancelAnalysis])
+
+  const formUserRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (formUserRef.current && formUserRef.current !== userId) {
+      cancelAnalysis()
+      setPhoto(null)
+      setAiResult(null)
+      setManualMode(false)
+      setSelectedLahanId('')
+      setCoords(null)
+      setSuccessId(null)
+      setSavedOffline(false)
+    }
+    formUserRef.current = userId
+  }, [userId, cancelAnalysis])
 
   const analyzePhoto = useCallback(async (blob: Blob) => {
     cancelAnalysis()
@@ -195,10 +317,11 @@ export default function ScanPage() {
       if (res.ok) {
         if (!AI_STATUS_LIST.includes(data?.status) ||
             !Number.isFinite(data?.confidence) || data.confidence < 0 || data.confidence > 1 ||
-            !Number.isFinite(data?.damage_pct) || data.damage_pct < 0 || data.damage_pct > 100) {
+            !Number.isFinite(data?.damage_pct) || data.damage_pct < 0 || data.damage_pct > 100 ||
+            typeof data?.analysis_id !== 'string') {
           throw new Error('Invalid analysis response')
         }
-        setAiResult({ status: data.status, confidence: data.confidence, damage_pct: data.damage_pct })
+        setAiResult({ status: data.status, confidence: data.confidence, damage_pct: data.damage_pct, analysis_id: data.analysis_id })
       } else if (res.status === 422 || data?.retake === true) {
         setAiRetake(true)
         setAiError('Foto ini belum dapat dianalisis. Ambil ulang foto padi yang lebih jelas, dekat, dan cukup terang.')
@@ -225,11 +348,32 @@ export default function ScanPage() {
     }
   }, [cancelAnalysis])
 
-  const handleFile = useCallback(async (file: File) => {
+  const captureGpsOnce = useCallback((): Promise<GpsSnapshot | null> => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy_m: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+            captured_at: new Date().toISOString(),
+          })
+        },
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 }
+      )
+    })
+  }, [])
+
+  const handleFile = useCallback(async (file: File, source: CaptureSource) => {
     cancelAnalysis()
     const photoVersion = photoVersionRef.current
+    const deviceCapturedAt = new Date().toISOString()
     setAnalyzing(false)
     setPhoto(null)
+    setWatermarked(null)
+    setPreviewTab('watermarked')
     // Kunci idempotency baru per foto. Ini memastikan tiap laporan (termasuk
     // saat offline, tanpa meninggalkan halaman) dapat identitas unik sehingga
     // entri antrian IndexedDB tidak saling menimpa. Retry laporan yang sama
@@ -258,43 +402,112 @@ export default function ScanPage() {
     }
 
     try {
-      const blob = await compressImage(file, 1280, 0.85)
+      // Pertahankan file foto asli byte-identical (tanpa re-encode yang mengubah SHA-256).
+      const [originalSha256, snap] = await Promise.all([
+        calculateSha256(file),
+        captureGpsOnce(),
+      ])
       if (photoVersionRef.current !== photoVersion) return
+      if (snap) {
+        setGpsSnapshot(snap)
+        setCoords({ lat: snap.latitude, lng: snap.longitude })
+        setLocationStatus('gps_captured')
+      } else {
+        setGpsSnapshot(null)
+        setLocationStatus('gps_unavailable_unverified')
+      }
       setPhoto({
-        blob,
-        previewUrl: URL.createObjectURL(blob),
-        name: blob.type === 'image/png' ? 'scan.png' : 'scan.jpg',
+        blob: file,
+        previewUrl: URL.createObjectURL(file),
+        name: file.type === 'image/png' ? 'original.png' : 'original.jpg',
+        originalSha256,
+        captureSource: source,
+        deviceCapturedAt,
       })
 
-      // Blob yang sama dipakai untuk analisis, retry, Storage, dan antrean offline.
-      await analyzePhoto(blob)
+      // Foto asli byte-identical dipakai untuk analisis AI, Storage, dan antrean offline.
+      await analyzePhoto(file)
     } catch {
       if (photoVersionRef.current !== photoVersion) return
       setAiRetake(true)
       setAiError('Foto belum dapat diproses. Silakan pilih foto JPG/PNG lain atau ambil ulang foto.')
     }
-  }, [analyzePhoto, cancelAnalysis])
+  }, [analyzePhoto, cancelAnalysis, captureGpsOnce])
 
   const handleGetLocation = useCallback(() => {
     if (!('geolocation' in navigator)) {
-      setSubmitError('GPS tidak didukung perangkat. Klik peta untuk memilih lokasi.')
+      setLocationStatus('gps_unavailable_unverified')
+      setSubmitError('GPS tidak didukung perangkat. Klik peta untuk memilih lokasi manual (status lokasi belum terverifikasi GPS).')
       return
     }
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        const snap: GpsSnapshot = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy_m: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+          captured_at: new Date().toISOString(),
+        }
+        setGpsSnapshot(snap)
+        setCoords({ lat: snap.latitude, lng: snap.longitude })
+        setLocationStatus('gps_captured')
         setLocating(false)
       },
       () => {
         setLocating(false)
-        setSubmitError('Tidak dapat mengambil GPS. Klik peta untuk memilih lokasi manual.')
+        setLocationStatus('gps_unavailable_unverified')
+        setSubmitError('GPS ditolak atau tidak tersedia. Pilih titik di dalam batas lahan pada peta (ditandai sebagai lokasi belum terverifikasi GPS).')
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   }, [])
 
   const selectedLahan = lahan.find((l) => l.id === selectedLahanId)
+  const selectedGeometry = useMemo(() => selectedLahan ? validatePolygon(selectedLahan.polygon) : null, [selectedLahan])
+  const verifiedRegionLabel = useMemo(() => {
+    if (!selectedLahan) return null
+    const extra = selectedLahan as LahanWithPolygon & { village?: string | null; district?: string | null }
+    const parts = [extra.village, extra.district].filter(Boolean)
+    return parts.length ? parts.join(', ') : selectedLahan.name
+  }, [selectedLahan])
+
+  // Buat salinan watermarked terpisah (foto asli tidak pernah dimutasi).
+  useEffect(() => {
+    if (!photo) { setWatermarked(null); return }
+    let cancelled = false
+    const lines = buildWatermarkLines({
+      gpsSnapshot,
+      locationStatus,
+      deviceCapturedAt: photo.deviceCapturedAt,
+      regionLabel: verifiedRegionLabel,
+      lahanId: selectedLahan?.id ?? null,
+      captureSource: photo.captureSource,
+    })
+    void createWatermarkedCopy(photo.blob, lines).then(async (wmBlob) => {
+      if (cancelled || !wmBlob) return
+      const sha = await calculateSha256(wmBlob)
+      if (cancelled) return
+      setWatermarked({ blob: wmBlob, previewUrl: URL.createObjectURL(wmBlob), sha256: sha, lines })
+    })
+    return () => { cancelled = true }
+  }, [photo, gpsSnapshot, locationStatus, verifiedRegionLabel, selectedLahan?.id])
+
+  const buildCaptureMetadata = useCallback((submittedOffline: boolean): ClientCaptureMetadata | null => {
+    if (!photo) return null
+    return {
+      version: PHOTO_EVIDENCE_VERSION,
+      capture_source: photo.captureSource,
+      location_status: locationStatus,
+      gps_snapshot: gpsSnapshot,
+      device_captured_at: photo.deviceCapturedAt,
+      submitted_offline: submittedOffline,
+      region_label: verifiedRegionLabel,
+      geometry_version_id: null,
+      watermark_applied: Boolean(watermarked),
+      watermark_lines: watermarked?.lines ?? [],
+    }
+  }, [photo, locationStatus, gpsSnapshot, verifiedRegionLabel, watermarked])
 
   const inBounds =
     selectedLahan && coords
@@ -303,7 +516,7 @@ export default function ScanPage() {
 
   // FR-03: simpan payload + foto (sudah dikompres) ke IndexedDB. Dipakai saat
   // benar-benar offline ATAU saat pengiriman online gagal karena network error.
-  const persistOffline = useCallback(async (): Promise<boolean> => {
+  const persistOffline = useCallback(async (connectionLost = false): Promise<boolean> => {
     if (!userId) {
       setSubmitError('Sesi tidak tersedia untuk penyimpanan offline. Coba lagi.')
       return false
@@ -312,34 +525,38 @@ export default function ScanPage() {
       setSubmitError('Pilih lahan tujuan laporan.')
       return false
     }
-    const aiStatus = aiResult?.status ?? (manualMode ? manualStatus : null)
+    const evidence = submissionEvidence({ manualMode, manualStatus, prediction: aiResult })
+    const photoBlobs = watermarked ? [photo!.blob, watermarked.blob] : [photo!.blob]
     const offlineReport: OfflineReport = {
       id: idempotencyKeyRef.current,
       idempotencyKey: idempotencyKeyRef.current,
       userId,
       lahanId: selectedLahan.id,
       photoPaths: [],
-      photoHash: '',
-      aiStatus,
-      aiConfidence: aiResult ? aiResult.confidence : null,
-      aiDamagePct: aiResult ? aiResult.damage_pct : null,
+      photoHash: photo!.originalSha256,
+      aiStatus: evidence.status,
+      aiConfidence: evidence.confidence,
+      aiDamagePct: evidence.damage_pct,
+      evidenceSource: evidence.source,
+      analysisId: evidence.analysis_id,
       latitude: coords!.lat,
       longitude: coords!.lng,
-      clientCreatedAt: new Date().toISOString(),
-      photoBlobs: [photo!.blob],
+      clientCreatedAt: photo!.deviceCapturedAt,
+      photoBlobs,
+      captureMetadata: buildCaptureMetadata(true),
       synced: false,
       retryCount: 0,
     }
     try {
       await saveReportOffline(offlineReport)
-      markOffline()
+      if (connectionLost) markOffline()
       setSavedOffline(true)
       return true
     } catch {
       setSubmitError('Gagal menyimpan laporan offline. Coba lagi.')
       return false
     }
-  }, [userId, selectedLahan, coords, photo, aiResult, manualMode, manualStatus])
+  }, [userId, selectedLahan, coords, photo, watermarked, buildCaptureMetadata, aiResult, manualMode, manualStatus])
 
   const handleSubmit = useCallback(async () => {
     setSubmitError(null)
@@ -354,6 +571,10 @@ export default function ScanPage() {
     }
     if (!coords) {
       setSubmitError('Ambil lokasi lewat GPS, atau klik peta.')
+      return
+    }
+    if (selectedGeometry && !selectedGeometry.valid) {
+      setSubmitError('Batas lahan belum valid untuk pemeriksaan lokasi. Minta pendaftar/pengelola memeriksa batas; foto tidak diubah dan ini bukan penolakan klaim.')
       return
     }
 
@@ -377,18 +598,21 @@ export default function ScanPage() {
       fd.append('latitude', String(coords.lat))
       fd.append('longitude', String(coords.lng))
       fd.append('idempotency_key', idempotencyKeyRef.current)
-      fd.append('client_created_at', new Date().toISOString())
-      if (aiResult) {
-        fd.append('ai_status', aiResult.status)
-        fd.append('ai_confidence', String(aiResult.confidence))
-        fd.append('ai_damage_pct', String(aiResult.damage_pct))
-      } else if (manualMode) {
-        fd.append('ai_status', manualStatus)
-      }
+      fd.append('client_created_at', photo.deviceCapturedAt)
+      const captureMeta = buildCaptureMetadata(false)
+      if (captureMeta) fd.append('capture_metadata', JSON.stringify(captureMeta))
+      const evidence = submissionEvidence({ manualMode, manualStatus, prediction: aiResult })
+      fd.append('evidence_source', evidence.source)
+      if (evidence.source === 'ai') fd.append('analysis_id', evidence.analysis_id)
+      if (evidence.source === 'manual') fd.append('manual_status', evidence.status)
       fd.append('photos', photo.blob, photo.name)
+      if (watermarked) {
+        fd.append('photos', watermarked.blob, watermarked.blob.type === 'image/png' ? 'watermarked.png' : 'watermarked.jpg')
+      }
 
       const res = await submitReport(fd)
       if (res.error) {
+        if (res.retryable) await persistOffline()
         setSubmitError(res.error)
         return
       }
@@ -400,14 +624,14 @@ export default function ScanPage() {
     } catch {
       // Network error (Supabase/Next.js tidak terjangkau walau navigator online):
       // fallback ke antrian IndexedDB — form offline tetap berfungsi.
-      const saved = await persistOffline()
+      const saved = await persistOffline(true)
       if (!saved) {
         setSubmitError('Koneksi gagal dan laporan belum tersimpan. Coba lagi.')
       }
     } finally {
       setSubmitting(false)
     }
-  }, [photo, selectedLahan, coords, aiResult, manualMode, manualStatus, persistOffline])
+  }, [photo, watermarked, buildCaptureMetadata, selectedLahan, selectedGeometry, coords, aiResult, manualMode, manualStatus, persistOffline])
 
   // Arahkan ke halaman laporan saat laporan sukses tersimpan
   useEffect(() => {
@@ -449,7 +673,7 @@ export default function ScanPage() {
               <Camera className="w-8 h-8 text-gray-500" aria-hidden="true" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-1">Ambil Foto Padi</h3>
-            <p className="text-gray-500 mb-6">JPG/PNG, maksimal 5MB. Otomatis dikompres 1280px.</p>
+            <p className="text-gray-500 mb-6">JPG/PNG, maksimal 5MB. Foto asli disimpan tanpa perubahan; salinan watermark dibuat terpisah.</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -473,11 +697,11 @@ export default function ScanPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo.previewUrl}
-              alt="Pratinjau foto padi"
-              className="w-full h-72 object-cover"
-            />
+            {detectionResult && previewTab === 'yolo' ? <DetectionOverlay imageSrc={photo.previewUrl} result={detectionResult} /> : <img
+              src={previewTab === 'watermarked' && watermarked ? watermarked.previewUrl : photo.previewUrl}
+              alt={previewTab === 'watermarked' && watermarked ? 'Salinan foto dengan watermark GPS' : 'Foto asli tanpa perubahan'}
+              className="w-full h-72 object-contain bg-slate-950"
+            />}
             {/* Bracket sudut viewport kamera */}
             <span className="pointer-events-none absolute inset-3" aria-hidden="true">
               <span className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-white/90 rounded-tl-md" />
@@ -486,7 +710,7 @@ export default function ScanPage() {
               <span className="absolute right-0 bottom-0 h-6 w-6 border-r-4 border-b-4 border-white/90 rounded-br-md" />
             </span>
             {/* Chip lokasi GPS */}
-            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/55 text-white text-xs backdrop-blur">
+            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/55 text-white text-xs backdrop-blur">
               <MapPin size={12} aria-hidden="true" />
               {coords ? 'Lokasi Terdeteksi' : 'Lokasi belum terdeteksi'}
             </span>
@@ -495,6 +719,10 @@ export default function ScanPage() {
                 cancelAnalysis()
                 setAnalyzing(false)
                 setPhoto(null)
+                setWatermarked(null)
+                setGpsSnapshot(null)
+                setLocationStatus('gps_unavailable_unverified')
+                setPreviewTab('watermarked')
                 setAiResult(null)
                 setAiError(null)
                 setAiRetake(false)
@@ -506,6 +734,58 @@ export default function ScanPage() {
               Ganti Foto
             </button>
           </div>
+
+          <div className="px-5 py-3 bg-slate-50 border-b border-gray-100 text-xs text-slate-700 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 font-medium">
+                  {captureSourceLabel(photo.captureSource)}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200">
+                  {locationStatusLabel(locationStatus)}
+                </span>
+              </div>
+              {(watermarked || detectionResult) && (
+                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                  {detectionResult && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab('yolo')}
+                      className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'yolo' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
+                    >
+                      Deteksi YOLO
+                    </button>
+                  )}
+                  {watermarked && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab('watermarked')}
+                      className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'watermarked' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
+                    >
+                      Salinan Watermark
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('original')}
+                    className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'original' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
+                  >
+                    Foto Asli
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-1 text-[11px] text-slate-600 font-mono">
+              <p>Waktu foto (perangkat): {formatWibTimestamp(photo.deviceCapturedAt)}</p>
+              <p>Akurasi GPS: {gpsSnapshot?.accuracy_m != null ? `±${Math.round(gpsSnapshot.accuracy_m)} m` : 'Tidak tersedia'}</p>
+              <p>SHA-256 Asli: {photo.originalSha256.slice(0, 16)}…</p>
+              <p>SHA-256 Watermark: {watermarked ? `${watermarked.sha256.slice(0, 16)}…` : 'Menyiapkan…'}</p>
+            </div>
+            <p className="text-[11px] text-slate-500">{PHOTO_EVIDENCE_DISCLAIMER}</p>
+          </div>
+
+          {yoloEnabled && <DetectionPanel result={detectionResult} loading={detectionLoading}
+            error={offline ? 'Sedang offline. Deteksi objek memerlukan koneksi; foto tetap dapat dilaporkan melalui antrean existing.' : detectionError} />}
 
           {analyzing && (
             <div className="p-6 flex items-center gap-3 text-gray-600" role="status" aria-live="polite">
@@ -519,25 +799,8 @@ export default function ScanPage() {
 
           {!analyzing && aiResult && (
             <div className="p-5 border-b border-gray-100">
-              <div className="flex items-start gap-3">
-                <div className={`p-3 rounded-xl ${AI_STATUS_INFO[aiResult.status].badgeClass}`}>
-                  <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">Hasil Analisis AI</h3>
-                  <p className="text-sm text-gray-600 mt-0.5">
-                    Status{' '}
-                    <span className={`font-medium ${AI_STATUS_INFO[aiResult.status].badgeClass} px-2 py-0.5 rounded-full`}>
-                      {AI_STATUS_INFO[aiResult.status].label}
-                    </span>{' '}
-                    · keyakinan {formatConfidence(aiResult.confidence)} · kerusakan{' '}
-                    {Math.round(aiResult.damage_pct)}%
-                  </p>
-                  <p className="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    {AI_STATUS_INFO[aiResult.status].recommendation}
-                  </p>
-                </div>
-              </div>
+              <AdvisoryAssessment assessment={advisoryAssessment({ ...aiResult, evidence_source: 'server_ai' })} technical />
+              <p className="mt-3 text-sm text-slate-700">{AI_STATUS_INFO[aiResult.status].recommendation}</p>
             </div>
           )}
 
@@ -567,34 +830,9 @@ export default function ScanPage() {
                   <p className="mt-0.5">{aiError}</p>
                 </div>
               </div>
-              {aiRetake ? (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Camera className="w-5 h-5" aria-hidden="true" />
-                  Ambil Ulang Foto
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => { if (photo) void analyzePhoto(photo.blob) }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <RefreshCw className="w-5 h-5" aria-hidden="true" />
-                    Coba Lagi
-                  </button>
-                  {!manualMode && (
-                    <button
-                      onClick={() => setManualMode(true)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-amber-300 text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
-                    >
-                      <FileWarning className="w-5 h-5" aria-hidden="true" />
-                      Gunakan Pelaporan Manual
-                    </button>
-                  )}
-                </>
-              )}
+              <AnalysisFailureActions retake={aiRetake} manualMode={manualMode}
+                onRetake={() => fileInputRef.current?.click()} onRetry={() => { if (photo) void analyzePhoto(photo.blob) }}
+                onManual={() => { cancelAnalysis(); setAnalyzing(false); setAiResult(null); setAiPending(false); setManualMode(true) }} />
             </div>
           )}
 
@@ -605,7 +843,7 @@ export default function ScanPage() {
                 Laporan Manual
               </h3>
               <p className="text-sm text-gray-600">
-                AI gagal, tetapi Anda tetap bisa melapor. Pilih status kerusakan sendiri:
+                Pilih indikasi menurut pengamatan Anda. Ini penilaian pelapor, bukan hasil AI atau pengukuran luas rusak:
               </p>
               <select
                 value={manualStatus}
@@ -618,6 +856,7 @@ export default function ScanPage() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-amber-900">Perlu Verifikasi · REVIEW_REQUIRED. PPL/Dinas meninjau laporan; keputusan klaim ada pada penanggung.</p>
             </div>
           )}
         </div>
@@ -661,7 +900,7 @@ export default function ScanPage() {
                 <option value="">Pilih lahan...</option>
                 {lahan.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.name} — {Number(l.area_hectares).toFixed(2)} Ha
+                    {l.name} — luas terdaftar {formatHectares(registeredArea(l.area_hectares))}
                   </option>
                 ))}
               </select>
@@ -699,7 +938,10 @@ export default function ScanPage() {
             <div className="mt-3 overflow-hidden rounded-lg border border-gray-300">
               <ScanMap
                 coords={coords}
-                onPick={setCoords}
+                onPick={(picked) => {
+                  setCoords(picked)
+                  if (!gpsSnapshot) setLocationStatus('manual_map_pin')
+                }}
                 polygon={selectedLahan ? (selectedLahan.polygon as Polygon) : null}
               />
             </div>
@@ -714,7 +956,9 @@ export default function ScanPage() {
                 inBounds ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
             >
-              {inBounds
+              {selectedGeometry && !selectedGeometry.valid
+                ? 'Batas lahan tersimpan belum valid; minta pendaftar/pengelola memeriksa batas sebelum mengirim.'
+                : inBounds
                 ? 'Lokasi berada di dalam batas lahan.'
                 : 'Lokasi di luar batas lahan — klik di dalam area hijau pada peta.'}
             </div>
@@ -737,15 +981,18 @@ export default function ScanPage() {
             </div>
           )}
 
+          <p className="text-xs text-slate-600">Kirim laporan untuk ditinjau PPL/Dinas. Luas terdampak belum terverifikasi; pengiriman bukan persetujuan klaim AUTP.</p>
           <button
             onClick={handleSubmit}
-            disabled={submitting || inBounds === false}
+            disabled={submitting || inBounds === false || selectedGeometry?.valid === false}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
           >
             {submitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> Mengirim laporan...
               </>
+            ) : selectedGeometry && !selectedGeometry.valid ? (
+              'Batas lahan perlu diperiksa'
             ) : inBounds === false ? (
               'Lokasi di luar lahan — pindahkan ke area hijau'
             ) : (
@@ -766,7 +1013,7 @@ export default function ScanPage() {
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
-          if (f) handleFile(f)
+          if (f) handleFile(f, 'camera_capture')
           e.target.value = ''
         }}
       />
@@ -777,7 +1024,7 @@ export default function ScanPage() {
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
-          if (f) handleFile(f)
+          if (f) handleFile(f, 'gallery_upload')
           e.target.value = ''
         }}
       />
