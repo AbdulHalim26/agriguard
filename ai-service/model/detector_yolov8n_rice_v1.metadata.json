@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "purpose": "model_training",
+  "label_schema": "rice_v1_9class",
+  "model_version": "yolov8n-rice-v1-2p",
+  "model_family": "yolov8n",
+  "task": "detect",
+  "model_sha256": "d52a4f04c75836f218dad6961784bdcc70745bc1d1797aa69681402ab41ec5d0",
+  "dataset_manifest_sha256": "64ca5b2db08632759f6d4a8e4e319222093484b0f443bf2ae8f004527ae275eb",
+  "export_parity_verified": true,
+  "input_name": "images",
+  "output_name": "output0",
+  "input_size": [
+    640,
+    640
+  ],
+  "preprocessing": "rgb_letterbox_114_bilinear_div255",
+  "output_format": "raw_cxcywh_bcn",
+  "classes": [
+    {
+      "class_id": 0,
+      "class_name": "Bacterial-Leaf-Blight",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 1,
+      "class_name": "Brown-Spot",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 2,
+      "class_name": "False-Smut",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 3,
+      "class_name": "Healthy",
+      "annotation_level": "leaf"
+    },
+    {
+      "class_id": 4,
+      "class_name": "Narrow-Brown-Spot",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 5,
+      "class_name": "Rice-Blast",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 6,
+      "class_name": "Sheath-Blight",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 7,
+      "class_name": "Stem-Rot",
+      "annotation_level": "lesion"
+    },
+    {
+      "class_id": 8,
+      "class_name": "Tungro-Virus",
+      "annotation_level": "lesion"
+    }
+  ]
+}

@@ -49,6 +49,10 @@ supabase/.temp/
 # AI service
 ai-service/model/*
 !ai-service/model/model.onnx
+!ai-service/model/model_v2.onnx
+!ai-service/model/model_v2.metadata.json
+!ai-service/model/detector_yolov8n_rice_v1.onnx
+!ai-service/model/detector_yolov8n_rice_v1.metadata.json
 !ai-service/model/config.json
 !ai-service/model/preprocessor_config.json
 ai-service/__pycache__/
