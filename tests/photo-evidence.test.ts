@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
+  GALLERY_LOCATION_WARNING,
   PHOTO_EVIDENCE_DISCLAIMER,
   PHOTO_EVIDENCE_VERSION,
   buildWatermarkLines,
@@ -344,5 +345,30 @@ test('PPL ReportVerification component renders inspection panel fields, original
   assert.match(src, /SHA-256 Foto Asli/)
   assert.match(src, /SHA-256 Salinan Watermark/)
   assert.match(src, /PHOTO_EVIDENCE_DISCLAIMER/)
+  assert.match(src, /GALLERY_LOCATION_WARNING/)
   assert.match(src, /Dikirim Offline/)
+})
+
+test('gallery_upload never claims GPS or watermark is proof of original photo location', () => {
+  assert.equal(
+    locationStatusLabel('gps_captured', 'gallery_upload'),
+    'GPS perangkat saat pilih file (bukan bukti lokasi foto asli)'
+  )
+  assert.equal(locationStatusLabel('gps_captured', 'camera_capture'), 'Snapshot GPS saat capture')
+  assert.match(GALLERY_LOCATION_WARNING, /bukan bukti lokasi atau waktu pengambilan foto asli/i)
+
+  const lines = buildWatermarkLines({
+    gpsSnapshot: {
+      latitude: -6.3302,
+      longitude: 107.3102,
+      accuracy_m: 15,
+      captured_at: '2026-11-26T02:05:09.000Z',
+    },
+    locationStatus: 'gps_captured',
+    deviceCapturedAt: '2026-11-26T02:05:09.000Z',
+    regionLabel: 'Lahan A',
+    lahanId: LAHAN_ID,
+    captureSource: 'gallery_upload',
+  })
+  assert.match(lines[2], /^GPS Unggah \(bukan lokasi asli\): -6\.330200, 107\.310200 \(±15 m\)$/)
 })

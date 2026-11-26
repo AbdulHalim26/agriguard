@@ -5,6 +5,9 @@ export const PHOTO_EVIDENCE_VERSION = 'photo-evidence-v1' as const
 export const PHOTO_EVIDENCE_DISCLAIMER =
   'Metadata GPS, waktu perangkat, EXIF, dan watermark bersifat pendukung dokumentasi; tidak menjamin keaslian absolut atau bahwa foto bebas manipulasi. Verifikasi tetap dilakukan PPL/Dinas.'
 
+export const GALLERY_LOCATION_WARNING =
+  'Unggahan galeri: koordinat GPS dan waktu berasal dari perangkat saat file dipilih, bukan bukti lokasi atau waktu pengambilan foto asli.'
+
 export type CaptureSource = 'camera_capture' | 'gallery_upload'
 export type LocationStatus = 'gps_captured' | 'manual_map_pin' | 'gps_unavailable_unverified'
 
@@ -74,8 +77,13 @@ export function captureSourceLabel(source?: string | null): string {
   return 'Tidak tercatat (data lama)'
 }
 
-export function locationStatusLabel(status?: string | null): string {
-  if (status === 'gps_captured') return 'Snapshot GPS saat capture'
+export function locationStatusLabel(status?: string | null, captureSource?: string | null): string {
+  if (status === 'gps_captured') {
+    if (captureSource === 'gallery_upload') {
+      return 'GPS perangkat saat pilih file (bukan bukti lokasi foto asli)'
+    }
+    return 'Snapshot GPS saat capture'
+  }
   if (status === 'manual_map_pin') return 'Pin peta manual (GPS tidak dipakai)'
   if (status === 'gps_unavailable_unverified') return 'Lokasi GPS belum terverifikasi'
   return 'Tidak tercatat'
@@ -89,8 +97,11 @@ export function buildWatermarkLines(params: {
   lahanId: string | null
   captureSource: CaptureSource
 }): string[] {
+  const gpsPrefix = params.captureSource === 'gallery_upload'
+    ? 'GPS Unggah (bukan lokasi asli)'
+    : 'GPS'
   const coordLine = params.gpsSnapshot
-    ? `GPS: ${params.gpsSnapshot.latitude.toFixed(6)}, ${params.gpsSnapshot.longitude.toFixed(6)}` +
+    ? `${gpsPrefix}: ${params.gpsSnapshot.latitude.toFixed(6)}, ${params.gpsSnapshot.longitude.toFixed(6)}` +
       (params.gpsSnapshot.accuracy_m != null ? ` (±${Math.round(params.gpsSnapshot.accuracy_m)} m)` : '')
     : 'GPS: Lokasi belum terverifikasi'
   const shortLahan = params.lahanId ? `#${params.lahanId.slice(0, 8)}` : 'Belum dipilih'

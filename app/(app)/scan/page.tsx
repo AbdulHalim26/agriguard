@@ -23,6 +23,7 @@ import {
   captureSourceLabel,
   createWatermarkedCopy,
   formatWibTimestamp,
+  GALLERY_LOCATION_WARNING,
   locationStatusLabel,
   PHOTO_EVIDENCE_DISCLAIMER,
   PHOTO_EVIDENCE_VERSION,
@@ -742,7 +743,7 @@ export default function ScanPage() {
                   {captureSourceLabel(photo.captureSource)}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200">
-                  {locationStatusLabel(locationStatus)}
+                  {locationStatusLabel(locationStatus, photo.captureSource)}
                 </span>
               </div>
               {(watermarked || detectionResult) && (
@@ -776,11 +777,16 @@ export default function ScanPage() {
               )}
             </div>
             <div className="grid sm:grid-cols-2 gap-1 text-[11px] text-slate-600 font-mono">
-              <p>Waktu foto (perangkat): {formatWibTimestamp(photo.deviceCapturedAt)}</p>
-              <p>Akurasi GPS: {gpsSnapshot?.accuracy_m != null ? `±${Math.round(gpsSnapshot.accuracy_m)} m` : 'Tidak tersedia'}</p>
+              <p>{photo.captureSource === 'gallery_upload' ? 'Waktu pilih file (perangkat)' : 'Waktu foto (perangkat)'}: {formatWibTimestamp(photo.deviceCapturedAt)}</p>
+              <p>{photo.captureSource === 'gallery_upload' ? 'Akurasi GPS saat unggah' : 'Akurasi GPS'}: {gpsSnapshot?.accuracy_m != null ? `±${Math.round(gpsSnapshot.accuracy_m)} m` : 'Tidak tersedia'}</p>
               <p>SHA-256 Asli: {photo.originalSha256.slice(0, 16)}…</p>
               <p>SHA-256 Watermark: {watermarked ? `${watermarked.sha256.slice(0, 16)}…` : 'Menyiapkan…'}</p>
             </div>
+            {photo.captureSource === 'gallery_upload' && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                {GALLERY_LOCATION_WARNING}
+              </p>
+            )}
             <p className="text-[11px] text-slate-500">{PHOTO_EVIDENCE_DISCLAIMER}</p>
           </div>
 

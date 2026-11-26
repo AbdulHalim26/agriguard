@@ -22,6 +22,7 @@ import AdvisoryAssessment from './AdvisoryAssessment'
 import { INSURANCE_NOTICE, reportAdvisory, UNKNOWN_AFFECTED_AREA_LABEL } from '@/lib/reports/advisory'
 import { formatHectares } from '@/lib/reports/area'
 import {
+  GALLERY_LOCATION_WARNING,
   PHOTO_EVIDENCE_DISCLAIMER,
   captureSourceLabel,
   formatWibTimestamp,
@@ -338,7 +339,7 @@ export default function ReportVerification() {
                   {captureSourceLabel(selected.photo_evidence?.capture_source)}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700">
-                  {locationStatusLabel(selected.photo_evidence?.location_status)}
+                  {locationStatusLabel(selected.photo_evidence?.location_status, selected.photo_evidence?.capture_source)}
                 </span>
                 {selected.photo_evidence?.submitted_offline && (
                   <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
@@ -389,6 +390,11 @@ export default function ReportVerification() {
                   </span>
                 </div>
               </div>
+              {selected.photo_evidence?.capture_source === 'gallery_upload' && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 leading-relaxed">
+                  {GALLERY_LOCATION_WARNING}
+                </p>
+              )}
               <p className="text-[11px] text-slate-500 leading-relaxed">
                 {selected.photo_evidence?.authenticity_note ?? PHOTO_EVIDENCE_DISCLAIMER}
               </p>
