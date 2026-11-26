@@ -113,8 +113,8 @@ export default function DashboardContent({ userName, userId, demoMode, role }: D
       {/* Prakiraan cuaca resmi BMKG sesuai lokasi petani (terpisah dari risiko banjir) */}
       <BmkgWeatherCard showFarmerActions={true} />
 
-      {/* Indikator risiko banjir terpisah (tanpa angka hidrologi yang belum didukung data nyata) */}
-      <DashboardHero userName={userName} hideUnsupportedHydrology={true} />
+      {/* Indikator risiko banjir terpisah (ringkas untuk petani bila hidrologi terverifikasi belum tersedia; tanpa duplikasi CTA Scan) */}
+      <DashboardHero userName={userName} showScanCta={false} hideUnsupportedHydrology={true} compactFarmer={true} />
 
       {/* Widget antrian offline (FR-03) */}
       <SyncWidget userId={userId} />

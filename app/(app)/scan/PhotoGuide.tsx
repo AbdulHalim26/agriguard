@@ -1,4 +1,4 @@
-import { Lightbulb, Sun, ScanLine, Ruler } from 'lucide-react'
+import { Lightbulb, Sun, ScanLine, Ruler, Image as ImageIcon } from 'lucide-react'
 
 const TIPS = [
   {
@@ -15,6 +15,11 @@ const TIPS = [
     icon: Ruler,
     title: 'Jarak 1–3 m',
     desc: 'Jaga jarak 1–3 meter agar daun tampak jelas dan penuh.',
+  },
+  {
+    icon: ImageIcon,
+    title: 'Satu Foto Utuh',
+    desc: 'Utamakan satu foto tanaman yang jelas, bukan kolase beberapa gambar.',
   },
 ]
 

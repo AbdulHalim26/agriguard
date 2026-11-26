@@ -17,6 +17,11 @@ export default function AdvisoryAssessment({ assessment, compact = false, techni
       Perlu Verifikasi · REVIEW_REQUIRED {compact ? '(penilaian)' : '(interpretasi penilaian awal)'}
     </p>
     {!compact && <>
+      <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+        {status === 'aman'
+          ? 'Hasil AI belum dapat dipastikan dan bukan bukti tanaman bebas hama (seperti ulat/wereng) atau penyakit di luar kelas model. Jika terlihat gejala di lapangan, gunakan Laporan Manual.'
+          : 'Hasil AI bersifat indikasi awal yang belum dapat dipastikan dan tidak mencakup seluruh jenis hama atau penyakit di luar kelas model.'}
+      </p>
       <p className="text-slate-700">{assessment.notice}</p>
       <p className="text-xs text-slate-600">Label indikasi adalah pemetaan status API, bukan diagnosis penyakit. Kelas asli dan versi model belum terikat pada receipt ini.</p>
       <p className="text-slate-700">{UNKNOWN_AFFECTED_AREA_LABEL}.</p>

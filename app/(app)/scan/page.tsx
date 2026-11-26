@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
@@ -137,6 +137,7 @@ export default function ScanPage() {
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('gps_unavailable_unverified')
   const [watermarked, setWatermarked] = useState<{ blob: Blob; previewUrl: string; sha256: string; lines: string[] } | null>(null)
   const [previewTab, setPreviewTab] = useState<'yolo' | 'watermarked' | 'original'>('watermarked')
+  const [mapReady, setMapReady] = useState(false)
   const [locating, setLocating] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
@@ -470,29 +471,55 @@ export default function ScanPage() {
     if (!selectedLahan) return null
     const extra = selectedLahan as LahanWithPolygon & { village?: string | null; district?: string | null }
     const parts = [extra.village, extra.district].filter(Boolean)
-    return parts.length ? parts.join(', ') : selectedLahan.name
+    return parts.length ? parts.join(', ') : null
   }, [selectedLahan])
 
-  // Buat salinan watermarked terpisah (foto asli tidak pernah dimutasi).
+  // Tunda mount ScanMap (Leaflet) satu frame setelah foto dipilih agar paint awal & INP tetap responsif.
+  useEffect(() => {
+    if (!photo) { setMapReady(false); return }
+    let rafId = 0
+    let timerId = 0
+    rafId = window.requestAnimationFrame(() => {
+      timerId = window.setTimeout(() => setMapReady(true), 0)
+    })
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      window.clearTimeout(timerId)
+    }
+  }, [photo])
+
+  // Buat salinan watermarked terpisah di luar frame interaksi agar tidak menghambat INP (foto asli tidak pernah dimutasi).
   useEffect(() => {
     if (!photo) { setWatermarked(null); return }
     let cancelled = false
+    let rafId = 0
+    let timerId = 0
     const lines = buildWatermarkLines({
       gpsSnapshot,
       locationStatus,
       deviceCapturedAt: photo.deviceCapturedAt,
       regionLabel: verifiedRegionLabel,
       lahanId: selectedLahan?.id ?? null,
+      lahanName: selectedLahan?.name ?? null,
       captureSource: photo.captureSource,
     })
-    void createWatermarkedCopy(photo.blob, lines).then(async (wmBlob) => {
-      if (cancelled || !wmBlob) return
-      const sha = await calculateSha256(wmBlob)
-      if (cancelled) return
-      setWatermarked({ blob: wmBlob, previewUrl: URL.createObjectURL(wmBlob), sha256: sha, lines })
+    rafId = window.requestAnimationFrame(() => {
+      timerId = window.setTimeout(() => {
+        if (cancelled) return
+        void createWatermarkedCopy(photo.blob, lines).then(async (wmBlob) => {
+          if (cancelled || !wmBlob) return
+          const sha = await calculateSha256(wmBlob)
+          if (cancelled) return
+          setWatermarked({ blob: wmBlob, previewUrl: URL.createObjectURL(wmBlob), sha256: sha, lines })
+        })
+      }, 0)
     })
-    return () => { cancelled = true }
-  }, [photo, gpsSnapshot, locationStatus, verifiedRegionLabel, selectedLahan?.id])
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(rafId)
+      window.clearTimeout(timerId)
+    }
+  }, [photo, gpsSnapshot, locationStatus, verifiedRegionLabel, selectedLahan?.id, selectedLahan?.name])
 
   const buildCaptureMetadata = useCallback((submittedOffline: boolean): ClientCaptureMetadata | null => {
     if (!photo) return null
@@ -701,6 +728,7 @@ export default function ScanPage() {
             {detectionResult && previewTab === 'yolo' ? <DetectionOverlay imageSrc={photo.previewUrl} result={detectionResult} /> : <img
               src={previewTab === 'watermarked' && watermarked ? watermarked.previewUrl : photo.previewUrl}
               alt={previewTab === 'watermarked' && watermarked ? 'Salinan foto dengan watermark GPS' : 'Foto asli tanpa perubahan'}
+              decoding="async"
               className="w-full h-72 object-contain bg-slate-950"
             />}
             {/* Bracket sudut viewport kamera */}
@@ -711,9 +739,13 @@ export default function ScanPage() {
               <span className="absolute right-0 bottom-0 h-6 w-6 border-r-4 border-b-4 border-white/90 rounded-br-md" />
             </span>
             {/* Chip lokasi GPS */}
-            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/55 text-white text-xs backdrop-blur">
-              <MapPin size={12} aria-hidden="true" />
-              {coords ? 'Lokasi Terdeteksi' : 'Lokasi belum terdeteksi'}
+            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/65 text-white text-xs backdrop-blur max-w-[72%] truncate">
+              <MapPin size={12} className="shrink-0" aria-hidden="true" />
+              {coords
+                ? (photo.captureSource === 'gallery_upload'
+                  ? 'GPS saat unggah (bukan lokasi foto asli)'
+                  : 'Lokasi Terdeteksi')
+                : 'Lokasi belum terdeteksi'}
             </span>
             <button
               onClick={() => {
@@ -751,7 +783,7 @@ export default function ScanPage() {
                   {detectionResult && (
                     <button
                       type="button"
-                      onClick={() => setPreviewTab('yolo')}
+                      onClick={() => startTransition(() => setPreviewTab('yolo'))}
                       className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'yolo' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
                     >
                       Deteksi YOLO
@@ -760,7 +792,7 @@ export default function ScanPage() {
                   {watermarked && (
                     <button
                       type="button"
-                      onClick={() => setPreviewTab('watermarked')}
+                      onClick={() => startTransition(() => setPreviewTab('watermarked'))}
                       className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'watermarked' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
                     >
                       Salinan Watermark
@@ -768,7 +800,7 @@ export default function ScanPage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => setPreviewTab('original')}
+                    onClick={() => startTransition(() => setPreviewTab('original'))}
                     className={`px-2 py-1 rounded-md text-xs font-medium ${previewTab === 'original' ? 'bg-green-600 text-white' : 'text-slate-600'}`}
                   >
                     Foto Asli
@@ -804,9 +836,35 @@ export default function ScanPage() {
           )}
 
           {!analyzing && aiResult && (
-            <div className="p-5 border-b border-gray-100">
+            <div className="p-5 border-b border-gray-100 space-y-3">
               <AdvisoryAssessment assessment={advisoryAssessment({ ...aiResult, evidence_source: 'server_ai' })} technical />
-              <p className="mt-3 text-sm text-slate-700">{AI_STATUS_INFO[aiResult.status].recommendation}</p>
+              <p className="text-sm text-slate-700">{AI_STATUS_INFO[aiResult.status].recommendation}</p>
+              {!manualMode ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
+                  <p className="text-xs text-amber-900">
+                    Hasil AI belum pasti atau hama/kerusakan di sawah tidak terdeteksi model?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setManualMode(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors shrink-0"
+                  >
+                    <FileWarning size={14} aria-hidden="true" />
+                    Gunakan Laporan Manual
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-600">
+                  <span>Mode Laporan Manual aktif (penilaian petani, diverifikasi PPL).</span>
+                  <button
+                    type="button"
+                    onClick={() => setManualMode(false)}
+                    className="underline text-slate-700 hover:text-slate-900 font-medium"
+                  >
+                    Kembali ke Hasil AI
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -942,14 +1000,20 @@ export default function ScanPage() {
                 : 'Belum ada lokasi. Gunakan GPS atau klik peta di bawah.'}
             </p>
             <div className="mt-3 overflow-hidden rounded-lg border border-gray-300">
-              <ScanMap
-                coords={coords}
-                onPick={(picked) => {
-                  setCoords(picked)
-                  if (!gpsSnapshot) setLocationStatus('manual_map_pin')
-                }}
-                polygon={selectedLahan ? (selectedLahan.polygon as Polygon) : null}
-              />
+              {mapReady ? (
+                <ScanMap
+                  coords={coords}
+                  onPick={(picked) => {
+                    setCoords(picked)
+                    if (!gpsSnapshot) setLocationStatus('manual_map_pin')
+                  }}
+                  polygon={selectedLahan ? (selectedLahan.polygon as Polygon) : null}
+                />
+              ) : (
+                <div className="h-56 w-full bg-slate-100 flex items-center justify-center text-xs text-slate-500">
+                  Menyiapkan peta lokasi…
+                </div>
+              )}
             </div>
             <p className="mt-1 text-xs text-gray-400 flex items-center gap-1">
               <MapPin size={12} aria-hidden="true" /> Area hijau = batas lahan terpilih. Klik di dalamnya untuk memilih lokasi.

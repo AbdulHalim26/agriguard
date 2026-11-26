@@ -9,13 +9,13 @@ import { RAIN_THRESHOLD_WASPADA_MM, WATER_LEVEL_THRESHOLD_BAHAYA_M, STATUS_CONFI
 const ICONS = { 'check-circle': CheckCircle, 'alert-triangle': AlertTriangle, 'alert-circle': AlertCircle,
   'help-circle': HelpCircle, clock: Clock }
 
-export default function FloodStatusPanel({ data, loading, error, offline = false, refresh, showScanCta = true, hideUnsupportedHydrology = false }: {
+export default function FloodStatusPanel({ data, loading, error, offline = false, refresh, showScanCta = true, hideUnsupportedHydrology = false, compactFarmer = false }: {
   data: FloodAssessment | null; loading: boolean; error: string | null; offline?: boolean
-  refresh: (simulation?: boolean) => void; showScanCta?: boolean; hideUnsupportedHydrology?: boolean
+  refresh: (simulation?: boolean) => void; showScanCta?: boolean; hideUnsupportedHydrology?: boolean; compactFarmer?: boolean
 }) {
-  if (loading) return <div className="rounded-2xl bg-slate-100 p-6 sm:p-8 text-slate-700" role="status" aria-live="polite">
-    <p className="font-semibold">Memperbarui indikator banjir…</p>
-    <p className="text-sm mt-1">Menunggu penilaian server; kondisi aman belum dapat disimpulkan.</p>
+  if (loading) return <div className="rounded-2xl bg-slate-100 p-5 text-slate-700" role="status" aria-live="polite">
+    <p className="font-semibold text-sm">Memperbarui indikator banjir…</p>
+    <p className="text-xs mt-1">Menunggu penilaian server; kondisi aman belum dapat disimpulkan.</p>
   </div>
   if (error || offline) data = unavailableAssessment(data, error || 'Sedang offline. Perbarui penilaian server.', data?.status === 'stale')
   const status = data?.status ?? 'unknown'
@@ -31,6 +31,54 @@ export default function FloodStatusPanel({ data, loading, error, offline = false
   const indicators = hideUnsupportedHydrology && !data?.simulation
     ? allIndicators.filter((item) => item.source.quality === 'VALID')
     : allIndicators
+  const hasVerifiedHydrology = data?.sources.water.quality === 'VALID'
+
+  if (compactFarmer && !data?.simulation && !hasVerifiedHydrology) {
+    return (
+      <section
+        className={`rounded-2xl ${style.bannerClass} text-white p-4 sm:p-5 shadow-sm`}
+        aria-label="Indikator peringatan dini banjir"
+        data-assessment-context={data?.context_id}
+        data-risk-status={status}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0" aria-live="polite">
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+              <Icon size={22} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wider text-white/80 font-semibold">Indikator risiko banjir (terpisah dari cuaca BMKG)</p>
+              <h2 className="text-lg sm:text-xl font-bold">{data?.label || 'BELUM DIKETAHUI'}</h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => refresh()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/40 hover:bg-white/15 text-xs font-medium"
+            >
+              <RotateCcw size={14} aria-hidden="true" />
+              {error ? 'Coba Lagi' : 'Perbarui'}
+            </button>
+            {data?.demo_available && (
+              <button
+                type="button"
+                onClick={() => refresh(!data.simulation)}
+                className="px-3 py-2 rounded-lg border border-white/40 hover:bg-white/15 text-xs font-medium"
+              >
+                Lihat Simulasi EWS
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="mt-2.5 text-xs sm:text-sm text-white/90">
+          {offline
+            ? 'Sedang offline — kondisi aman banjir belum dapat disimpulkan.'
+            : 'Data hidrologi/tinggi air terverifikasi untuk lahan belum tersedia. Kondisi aman banjir belum dapat disimpulkan.'}
+        </p>
+      </section>
+    )
+  }
   return <section className={`rounded-2xl ${style.bannerClass} text-white p-5 sm:p-8 shadow-lg`}
     aria-label="Indikator peringatan dini banjir" data-assessment-context={data?.context_id} data-risk-status={status}>
     <div className="flex items-center gap-4" aria-live="polite">

@@ -5,16 +5,20 @@ import Link from 'next/link'
 import { CloudSun, MapPin, Wind, Droplets, RefreshCw, AlertTriangle, Camera, FileText, WifiOff } from 'lucide-react'
 import { requestLocation } from '@/lib/location'
 import { useOfflineStatus } from '@/lib/offline/status'
-import type { BmkgWeatherResponse } from '@/lib/ews/bmkg'
+import type { BmkgLocationMode, BmkgWeatherResponse } from '@/lib/ews/bmkg'
 import { formatBmkgWib } from '@/lib/ews/bmkg'
 
 export default function BmkgWeatherCard({ showFarmerActions = true }: { showFarmerActions?: boolean }) {
   const [data, setData] = useState<BmkgWeatherResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [locationMode, setLocationMode] = useState<BmkgLocationMode>('parcel_first')
+  const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null)
   const offline = useOfflineStatus()
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { mode?: BmkgLocationMode; parcelId?: string | null }) => {
+    const activeMode = opts?.mode ?? locationMode
+    const activeParcelId = opts?.parcelId !== undefined ? opts.parcelId : selectedParcelId
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setLoading(false)
       setError('Sedang offline. Prakiraan cuaca BMKG tidak dapat diperbarui.')
@@ -29,19 +33,33 @@ export default function BmkgWeatherCard({ showFarmerActions = true }: { showFarm
         qs.set('lat', String(loc.lat))
         qs.set('lon', String(loc.lng))
       }
+      if (activeMode === 'device_only') qs.set('mode', 'device_only')
+      if (activeParcelId) qs.set('parcel_id', activeParcelId)
       const res = await fetch(`/api/weather/bmkg${qs.toString() ? `?${qs.toString()}` : ''}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('BMKG_FETCH_FAILED')
-      setData((await res.json()) as BmkgWeatherResponse)
+      const body = (await res.json()) as BmkgWeatherResponse
+      setData(body)
+      if (!activeParcelId && body.selected_parcel?.id) {
+        setSelectedParcelId(body.selected_parcel.id)
+      }
     } catch {
       setError('Prakiraan cuaca BMKG belum dapat dimuat. Kondisi aman belum dapat disimpulkan.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [locationMode, selectedParcelId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const headingLabel = (() => {
+    if (!data) return loading ? 'Memeriksa lokasi…' : 'Lokasi belum dapat dipastikan'
+    if (data.location_source === 'registered_lahan' && data.selected_parcel?.name && data.adm4) {
+      return `Prakiraan untuk ${data.selected_parcel.name} — ${data.location_label}`
+    }
+    return data.location_label || 'Lokasi belum dapat dipastikan'
+  })()
 
   return (
     <section
@@ -49,11 +67,11 @@ export default function BmkgWeatherCard({ showFarmerActions = true }: { showFarm
       className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-sky-700">Prakiraan Cuaca BMKG</p>
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 flex items-center gap-2">
             <MapPin size={18} className="text-sky-600 shrink-0" aria-hidden="true" />
-            <span>{data?.location_label || (loading ? 'Memeriksa lokasi…' : 'Lokasi belum dapat dipastikan')}</span>
+            <span className="break-words">{headingLabel}</span>
           </h2>
           {data && (
             <p className="text-xs text-slate-600 mt-1">
@@ -62,16 +80,61 @@ export default function BmkgWeatherCard({ showFarmerActions = true }: { showFarm
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
-          Perbarui
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const nextMode: BmkgLocationMode = locationMode === 'parcel_first' ? 'device_only' : 'parcel_first'
+              setLocationMode(nextMode)
+              void load({ mode: nextMode })
+            }}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 text-xs font-medium disabled:opacity-50"
+          >
+            {locationMode === 'parcel_first' ? 'Gunakan Lokasi Perangkat' : 'Gunakan Lahan Terdaftar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+            Perbarui
+          </button>
+        </div>
       </div>
+
+      {data?.available_parcels && data.available_parcels.length > 1 && locationMode === 'parcel_first' && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label htmlFor="bmkg-parcel-select" className="font-medium text-slate-700">
+            Pilih Lahan:
+          </label>
+          <select
+            id="bmkg-parcel-select"
+            aria-label="Pilih lahan untuk prakiraan BMKG"
+            value={selectedParcelId || data.selected_parcel?.id || ''}
+            onChange={(e) => {
+              const nextId = e.target.value
+              setSelectedParcelId(nextId)
+              void load({ mode: 'parcel_first', parcelId: nextId })
+            }}
+            className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs"
+          >
+            {data.available_parcels.map((parcel) => (
+              <option key={parcel.id} value={parcel.id}>
+                {parcel.name}{parcel.district ? ` — ${parcel.district}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {data?.device_outside_parcel && data.location_source === 'registered_lahan' && (
+        <p className="text-xs text-sky-900 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+          GPS perangkat saat ini berada di luar batas lahan. Menampilkan prakiraan cuaca untuk <strong>lokasi lahan terdaftar</strong> (bukan lokasi GPS perangkat).
+        </p>
+      )}
 
       {offline && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs" role="alert">

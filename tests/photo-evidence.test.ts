@@ -156,11 +156,46 @@ test('buildWatermarkLines handles gps_unavailable_unverified without fabricating
 
   assert.match(lines[0], /Unggahan Galeri/)
   assert.equal(lines[2], 'GPS: Lokasi belum terverifikasi')
-  assert.equal(lines[3], 'Wilayah: Wilayah belum terverifikasi')
+  assert.equal(lines[3], 'Wilayah: Wilayah administratif belum diverifikasi')
   assert.equal(captureSourceLabel('camera_capture'), 'Kamera Aplikasi')
   assert.equal(captureSourceLabel('gallery_upload'), 'Unggahan Galeri')
   assert.equal(captureSourceLabel(null), 'Tidak tercatat (data lama)')
   assert.equal(locationStatusLabel('gps_unavailable_unverified'), 'Lokasi GPS belum terverifikasi')
+
+  // PHASE 2.0R.2: parcel name belongs on Lahan line, NEVER substituted as administrative Wilayah
+  const linesWithParcelOnly = buildWatermarkLines({
+    gpsSnapshot: {
+      latitude: -6.1647,
+      longitude: 106.8454,
+      accuracy_m: 20,
+      captured_at: '2026-11-26T02:05:09.000Z',
+    },
+    locationStatus: 'gps_captured',
+    deviceCapturedAt: '2026-11-26T02:05:09.000Z',
+    regionLabel: null,
+    lahanId: LAHAN_ID,
+    lahanName: 'Lahan Uji A',
+    captureSource: 'gallery_upload',
+  })
+  assert.match(linesWithParcelOnly[1], /Lahan #22222222 \(Lahan Uji A\)/)
+  assert.match(linesWithParcelOnly[2], /^GPS Unggah \(bukan lokasi asli\):/)
+  assert.equal(linesWithParcelOnly[3], 'Wilayah: Wilayah administratif belum diverifikasi')
+})
+
+test('PHASE 2.0R.2: scanner UI enforces gallery GPS badge, manual reporting CTA, uncertainty notice, and single-photo guide', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { resolve } = await import('node:path')
+  const scanSrc = readFileSync(resolve(process.cwd(), 'app/(app)/scan/page.tsx'), 'utf8')
+  const guideSrc = readFileSync(resolve(process.cwd(), 'app/(app)/scan/PhotoGuide.tsx'), 'utf8')
+  const advSrc = readFileSync(resolve(process.cwd(), 'components/features/AdvisoryAssessment.tsx'), 'utf8')
+  const detSrc = readFileSync(resolve(process.cwd(), 'components/features/DetectionOverlay.tsx'), 'utf8')
+
+  assert.match(scanSrc, /GPS saat unggah \(bukan lokasi foto asli\)/)
+  assert.match(scanSrc, /Gunakan Laporan Manual/)
+  assert.doesNotMatch(scanSrc, /return parts\.length \? parts\.join\(', '\) : selectedLahan\.name/)
+  assert.match(guideSrc, /Utamakan satu foto tanaman yang jelas, bukan kolase beberapa gambar\./)
+  assert.match(advSrc, /bukan bukti tanaman bebas hama/)
+  assert.match(detSrc, /bukan bukti tanaman sehat/)
 })
 
 test('parseReportInput accepts valid capture_metadata and rejects malformed JSON or invalid schema', () => {

@@ -30,7 +30,7 @@ export default function DetectionOverlay({ imageSrc, result }: { imageSrc: strin
     <div className="relative w-full overflow-hidden bg-gray-100" style={{ aspectRatio: `${result.image_width} / ${result.image_height}` }}>
       {/* Same EXIF-normalized compressed Blob is displayed, detected and reported. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={imageSrc} alt="Foto padi dengan lokasi objek hasil deteksi YOLO" className="absolute inset-0 w-full h-full object-contain"
+      <img src={imageSrc} alt="Foto padi dengan lokasi objek hasil deteksi YOLO" decoding="async" className="absolute inset-0 w-full h-full object-contain"
         onLoad={(event) => setLoaded({ src: imageSrc, width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
         onError={() => setFailedSrc(imageSrc)} />
       {matches && failedSrc !== imageSrc && <DetectionBoxLayer detections={result.detections} width={result.image_width} height={result.image_height} />}
@@ -49,7 +49,7 @@ export function DetectionPanel({ result, loading, error }: { result: DetectionRe
     {result && <>
       <p className="text-xs text-gray-500">{result.model_family} · {result.model_version} · {result.image_width} × {result.image_height}</p>
       <span className="inline-block rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">REVIEW_REQUIRED — perlu tinjauan PPL</span>
-      {result.detections.length === 0 ? <p className="text-sm text-gray-700">Tidak ada objek terdeteksi. Kondisi sehat belum dapat disimpulkan.</p> :
+      {result.detections.length === 0 ? <p className="text-sm text-gray-700">Tidak ada objek terdeteksi. Kondisi sehat belum dapat disimpulkan — ini <strong>bukan bukti tanaman sehat</strong> atau bebas hama/penyakit di luar kelas model; gunakan Laporan Manual bila terlihat gejala di lapangan.</p> :
         <ul className="space-y-1 text-sm text-gray-700">{result.detections.map((item, index) => {
           const info = interpretDetectionClass(item.class_name)
           return <li key={index} className="flex flex-wrap items-center gap-1.5">

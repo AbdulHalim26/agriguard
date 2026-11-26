@@ -12,6 +12,7 @@ export const BMKG_MAX_XML_BYTES = 512 * 1024
 export const ADM4_REGEX = /^\d{2}\.\d{2}\.\d{2}\.\d{4}$/
 
 export type BmkgLocationSource = 'device' | 'registered_lahan' | 'unverified'
+export type BmkgLocationMode = 'parcel_first' | 'device_only'
 export type BmkgWeatherStatus = 'OK' | 'STALE' | 'DATA_TIDAK_TERSEDIA' | 'LOKASI_BELUM_DIVERIFIKASI'
 export type BmkgCapStatus = 'ACTIVE_ALERTS' | 'NO_ACTIVE_ALERTS' | 'UNAVAILABLE'
 
@@ -98,7 +99,14 @@ export interface ResolvedAdm4 {
   kecamatan: string | null
   desa: string | null
   verified_point: { lat: number; lon: number } | null
+  device_outside_parcel?: boolean
+  parcel_id?: string | null
+  parcel_name?: string | null
   reason: string
+}
+
+export function resolveVerifiedAdm4ForAdmin(village?: string | null, district?: string | null): string | null {
+  return findRegistryByAdmin(village, district)?.adm4 ?? null
 }
 
 function findRegistryByAdmin(village?: string | null, district?: string | null): VerifiedAdm4Entry | null {
@@ -141,7 +149,10 @@ function polygonCentroid(polygon: unknown): { lat: number; lon: number } | null 
 export function resolveLocationToAdm4(params: {
   explicitAdm4?: string | null
   deviceCoords?: { lat: number; lon: number } | null
+  locationPreference?: BmkgLocationMode
   registeredLahan?: {
+    id?: string | null
+    name?: string | null
     village?: string | null
     district?: string | null
     polygon?: unknown
@@ -156,6 +167,9 @@ export function resolveLocationToAdm4(params: {
     kecamatan: null,
     desa: null,
     verified_point: null,
+    device_outside_parcel: false,
+    parcel_id: params.registeredLahan?.id ?? null,
+    parcel_name: params.registeredLahan?.name ?? null,
     reason,
   })
 
@@ -176,6 +190,9 @@ export function resolveLocationToAdm4(params: {
         kecamatan: match.kecamatan,
         desa: match.desa,
         verified_point: params.registeredLahan?.polygon ? polygonCentroid(params.registeredLahan.polygon) : null,
+        device_outside_parcel: false,
+        parcel_id: params.registeredLahan?.id ?? null,
+        parcel_name: params.registeredLahan?.name ?? null,
         reason: 'Kode wilayah tingkat IV (adm4) terverifikasi eksplisit.',
       }
     }
@@ -188,6 +205,9 @@ export function resolveLocationToAdm4(params: {
       kecamatan: null,
       desa: null,
       verified_point: null,
+      device_outside_parcel: false,
+      parcel_id: params.registeredLahan?.id ?? null,
+      parcel_name: params.registeredLahan?.name ?? null,
       reason: 'Kode wilayah tingkat IV (adm4) diberikan secara eksplisit.',
     }
   }
@@ -195,6 +215,7 @@ export function resolveLocationToAdm4(params: {
   const lahanEntry = params.registeredLahan
     ? findRegistryByAdmin(params.registeredLahan.village, params.registeredLahan.district)
     : null
+  const preferParcelFallback = params.locationPreference === 'parcel_first'
 
   // 1. Device GPS provided: MUST validate coordinates and prove boundary containment (no radius guessing!)
   if (params.deviceCoords !== undefined && params.deviceCoords !== null) {
@@ -214,12 +235,47 @@ export function resolveLocationToAdm4(params: {
           kecamatan: lahanEntry.kecamatan,
           desa: lahanEntry.desa,
           verified_point: { lat, lon },
+          device_outside_parcel: false,
+          parcel_id: params.registeredLahan.id ?? null,
+          parcel_name: params.registeredLahan.name ?? null,
           reason: 'GPS perangkat berada di dalam batas lahan terdaftar yang terpetakan ke adm4 terverifikasi.',
+        }
+      }
+      if (preferParcelFallback) {
+        return {
+          adm4: lahanEntry.adm4,
+          location_source: 'registered_lahan',
+          location_label: `${lahanEntry.desa}, ${lahanEntry.kecamatan}, ${lahanEntry.kotkab}`,
+          provinsi: lahanEntry.provinsi,
+          kotkab: lahanEntry.kotkab,
+          kecamatan: lahanEntry.kecamatan,
+          desa: lahanEntry.desa,
+          verified_point: polygonCentroid(params.registeredLahan.polygon),
+          device_outside_parcel: true,
+          parcel_id: params.registeredLahan.id ?? null,
+          parcel_name: params.registeredLahan.name ?? null,
+          reason: 'GPS perangkat berada di luar batas lahan terdaftar; menampilkan prakiraan untuk lahan terdaftar yang terverifikasi (bukan lokasi GPS perangkat).',
         }
       }
       return unverified(
         'Koordinat GPS perangkat berada di luar batas lahan terdaftar dan belum tersedia batas poligon administrasi resmi BIG/Kemendagri untuk pemetaan adm4 otomatis.'
       )
+    }
+    if (preferParcelFallback && lahanEntry) {
+      return {
+        adm4: lahanEntry.adm4,
+        location_source: 'registered_lahan',
+        location_label: `${lahanEntry.desa}, ${lahanEntry.kecamatan}, ${lahanEntry.kotkab}`,
+        provinsi: lahanEntry.provinsi,
+        kotkab: lahanEntry.kotkab,
+        kecamatan: lahanEntry.kecamatan,
+        desa: lahanEntry.desa,
+        verified_point: params.registeredLahan?.polygon ? polygonCentroid(params.registeredLahan.polygon) : null,
+        device_outside_parcel: true,
+        parcel_id: params.registeredLahan?.id ?? null,
+        parcel_name: params.registeredLahan?.name ?? null,
+        reason: 'GPS perangkat tidak berada pada batas lahan; menampilkan prakiraan untuk lahan terdaftar yang terverifikasi (bukan lokasi GPS perangkat).',
+      }
     }
     return unverified(
       'Koordinat GPS perangkat tidak dapat dipetakan ke adm4 tanpa poligon batas administrasi resmi BIG/Kemendagri.'
@@ -237,6 +293,9 @@ export function resolveLocationToAdm4(params: {
       kecamatan: lahanEntry.kecamatan,
       desa: lahanEntry.desa,
       verified_point: params.registeredLahan?.polygon ? polygonCentroid(params.registeredLahan.polygon) : null,
+      device_outside_parcel: false,
+      parcel_id: params.registeredLahan?.id ?? null,
+      parcel_name: params.registeredLahan?.name ?? null,
       reason: 'Dipetakan dari wilayah administratif lahan/Poktan terdaftar (GPS perangkat tidak digunakan).',
     }
   }
@@ -301,6 +360,14 @@ export interface BmkgCapAlert {
   notice: string
 }
 
+export interface BmkgParcelOption {
+  id: string
+  name: string
+  village: string | null
+  district: string | null
+  adm4: string | null
+}
+
 export interface BmkgWeatherResponse {
   status: BmkgWeatherStatus
   source: 'BMKG'
@@ -308,6 +375,10 @@ export interface BmkgWeatherResponse {
   location_source_label: string
   location_label: string
   adm4: string | null
+  location_mode?: BmkgLocationMode
+  device_outside_parcel?: boolean
+  selected_parcel?: BmkgParcelOption | null
+  available_parcels?: BmkgParcelOption[]
   forecast: BmkgForecastSlot | null
   cap_status: BmkgCapStatus
   cap_alerts: BmkgCapAlert[]
@@ -649,6 +720,7 @@ export function createBmkgService(deps: {
       location_source_label: locationSourceDisplay(resolved.location_source),
       location_label: resolved.location_label,
       adm4: resolved.adm4,
+      device_outside_parcel: resolved.device_outside_parcel ?? false,
       retrieved_at: new Date(now).toISOString(),
       flood_risk_note: 'Risiko banjir sawah dinilai terpisah; jika data hidrologi terverifikasi belum tersedia, status risiko tetap BELUM DIKETAHUI.',
       disclaimer: BMKG_DISCLAIMER,

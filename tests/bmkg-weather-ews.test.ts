@@ -288,3 +288,96 @@ test('TAHAP E & F: FloodStatusPanel hides unsupported hydrology, API enforces au
   assert.match(cardSrc, /Status peringatan dini belum tersedia\./)
   assert.doesNotMatch(cardSrc, /Lokasi Anda/)
 })
+
+test('PHASE 2.0R.2: parcel_first fallback when GPS outside parcel, device_only fail-closed, unverified parcel fail-closed, compact farmer EWS, and AI uncertainty', () => {
+  // 1. Farmer A with 1 verified parcel + device GPS outside parcel (Jakarta) in parcel_first mode -> registered_lahan fallback (NEVER claims device)
+  const fallback = resolveLocationToAdm4({
+    deviceCoords: { lat: -6.1647, lon: 106.8454 },
+    locationPreference: 'parcel_first',
+    registeredLahan: {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Lahan Uji A',
+      village: 'Desa Uji A',
+      district: 'Telukjambe Timur',
+      polygon: LAHAN_A_POLY,
+    },
+  })
+  assert.equal(fallback.location_source, 'registered_lahan')
+  assert.equal(fallback.adm4, '32.15.03.2001')
+  assert.equal(fallback.device_outside_parcel, true)
+  assert.equal(fallback.parcel_name, 'Lahan Uji A')
+
+  // 2. Explicit device_only mode with GPS outside parcel -> still strictly FAIL CLOSED
+  const deviceOnly = resolveLocationToAdm4({
+    deviceCoords: { lat: -6.1647, lon: 106.8454 },
+    locationPreference: 'device_only',
+    registeredLahan: {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Lahan Uji A',
+      village: 'Desa Uji A',
+      district: 'Telukjambe Timur',
+      polygon: LAHAN_A_POLY,
+    },
+  })
+  assert.equal(deviceOnly.location_source, 'unverified')
+  assert.equal(deviceOnly.adm4, null)
+
+  // 3. Farmer parcel with UNVERIFIED adm4 even in parcel_first mode -> strictly FAIL CLOSED (no guessing!)
+  const unverifiedParcel = resolveLocationToAdm4({
+    deviceCoords: { lat: -6.1647, lon: 106.8454 },
+    locationPreference: 'parcel_first',
+    registeredLahan: {
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Lahan Belum Terpetakan',
+      village: 'Desa Tidak Terdaftar',
+      district: 'Kecamatan Tidak Terdaftar',
+      polygon: LAHAN_A_POLY,
+    },
+  })
+  assert.equal(unverifiedParcel.location_source, 'unverified')
+  assert.equal(unverifiedParcel.adm4, null)
+
+  // 4. Compact farmer FloodStatusPanel hides duplicate Scan CTA and legacy water-age/Karawang-default text
+  //    even if legacy weather source exists, whenever verified hydrology (water) is unavailable
+  const now = Date.parse('2026-11-26T15:30:00Z')
+  const policy = readEwsPolicy({})
+  const weather = weatherResult(emptySource('FORECAST', weatherContext(), now, 'MISSING', 'Belum tersedia'), now)
+  const validWeather = weatherResult({
+    ...emptySource('FORECAST', weatherContext(), now, 'VALID', 'Prakiraan hujan'),
+    value: 1.2,
+    unit: 'mm/3h',
+    valid_from: new Date(now).toISOString(),
+    valid_until: new Date(now + 3 * 60 * 60_000).toISOString(),
+  }, now)
+  const water = emptySource('MANUAL_REPORT', { coordinates: null, location_source: 'district', district: null }, now, 'MISSING', 'Belum ada laporan tinggi air')
+  const assessment = createFloodAssessment({ userId: 'u1', weather: validWeather, water, policy, now, demoAvailable: false })
+  const compactHtml = renderToStaticMarkup(
+    React.createElement(FloodStatusPanel, {
+      data: assessment,
+      loading: false,
+      error: null,
+      refresh: () => {},
+      showScanCta: false,
+      hideUnsupportedHydrology: true,
+      compactFarmer: true,
+    })
+  )
+  assert.match(compactHtml, /BELUM DIKETAHUI/)
+  assert.doesNotMatch(compactHtml, /SCAN KERUSAKAN SAWAH/)
+  assert.doesNotMatch(compactHtml, /Batas umur sementara/)
+  assert.doesNotMatch(compactHtml, /default pusat Karawang/)
+  assert.equal(weather.quality, 'MISSING')
+
+  // 5. Route enforces parcel_id ownership (403 on cross-user parcel) and supports mode=device_only
+  const routeSrc = readFileSync(resolve(process.cwd(), 'app/api/weather/bmkg/route.ts'), 'utf8')
+  assert.match(routeSrc, /parcel_id/)
+  assert.match(routeSrc, /device_only/)
+  assert.match(routeSrc, /!ownedLahan\.some\(/)
+
+  // 6. BmkgWeatherCard supports multi-parcel selector and device location toggle
+  const cardSrc = readFileSync(resolve(process.cwd(), 'components/features/BmkgWeatherCard.tsx'), 'utf8')
+  assert.match(cardSrc, /Gunakan Lokasi Perangkat/)
+  assert.match(cardSrc, /Gunakan Lahan Terdaftar/)
+  assert.match(cardSrc, /Pilih lahan untuk prakiraan BMKG/)
+  assert.match(cardSrc, /Prakiraan untuk \$\{data\.selected_parcel\.name\}/)
+})

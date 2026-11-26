@@ -95,6 +95,7 @@ export function buildWatermarkLines(params: {
   deviceCapturedAt: string
   regionLabel: string | null
   lahanId: string | null
+  lahanName?: string | null
   captureSource: CaptureSource
 }): string[] {
   const gpsPrefix = params.captureSource === 'gallery_upload'
@@ -105,13 +106,36 @@ export function buildWatermarkLines(params: {
       (params.gpsSnapshot.accuracy_m != null ? ` (±${Math.round(params.gpsSnapshot.accuracy_m)} m)` : '')
     : 'GPS: Lokasi belum terverifikasi'
   const shortLahan = params.lahanId ? `#${params.lahanId.slice(0, 8)}` : 'Belum dipilih'
-  const region = params.regionLabel?.trim() || 'Wilayah belum terverifikasi'
+  const cleanLahanName = params.lahanName?.trim() ? ` (${params.lahanName.trim().slice(0, 28)})` : ''
+  const region = params.regionLabel?.trim() || 'Wilayah administratif belum diverifikasi'
   return [
     `AgriGuard · ${captureSourceLabel(params.captureSource)}`,
-    `${formatWibTimestamp(params.deviceCapturedAt)} · Lahan ${shortLahan}`,
+    `${formatWibTimestamp(params.deviceCapturedAt)} · Lahan ${shortLahan}${cleanLahanName}`,
     coordLine,
     `Wilayah: ${region}`,
   ]
+}
+
+function drawWatermarkOverlay(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  w: number,
+  h: number,
+  lines: string[],
+) {
+  const fontSize = Math.max(11, Math.min(18, Math.round(w / 42)))
+  const lineHeight = Math.round(fontSize * 1.38)
+  const padX = Math.max(10, Math.round(w * 0.02))
+  const padY = Math.max(8, Math.round(fontSize * 0.6))
+  const boxHeight = Math.min(h, padY * 2 + lines.length * lineHeight)
+
+  ctx.fillStyle = 'rgba(11, 37, 69, 0.78)'
+  ctx.fillRect(0, h - boxHeight, w, boxHeight)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = `600 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`
+  ctx.textBaseline = 'top'
+  lines.forEach((line, i) => {
+    ctx.fillText(line, padX, h - boxHeight + padY + i * lineHeight, w - padX * 2)
+  })
 }
 
 // Browser-only: renders a SEPARATE watermarked copy without ever mutating originalBlob.
@@ -120,13 +144,40 @@ export async function createWatermarkedCopy(
   lines: string[],
 ): Promise<Blob | null> {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null
+  const outType = originalBlob.type === 'image/png' ? 'image/png' : 'image/jpeg'
+  const quality = outType === 'image/jpeg' ? 0.88 : undefined
+  const maxDim = 1280
+
+  // Prefer async createImageBitmap + OffscreenCanvas to avoid blocking main-thread paint/INP.
+  if (typeof createImageBitmap === 'function' && typeof OffscreenCanvas !== 'undefined') {
+    try {
+      const bitmap = await createImageBitmap(originalBlob)
+      try {
+        const scale = Math.min(1, maxDim / Math.max(bitmap.width || 1, bitmap.height || 1))
+        const w = Math.max(1, Math.round((bitmap.width || 320) * scale))
+        const h = Math.max(1, Math.round((bitmap.height || 240) * scale))
+        const canvas = new OffscreenCanvas(w, h)
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0, w, h)
+          drawWatermarkOverlay(ctx, w, h, lines)
+          const blob = await canvas.convertToBlob({ type: outType, quality })
+          if (blob && blob.size > 0) return blob
+        }
+      } finally {
+        bitmap.close()
+      }
+    } catch {
+      // Fall back to standard Image + HTMLCanvasElement below.
+    }
+  }
+
   return new Promise((resolve) => {
     const img = new Image()
     const url = URL.createObjectURL(originalBlob)
     img.onload = () => {
       try {
         URL.revokeObjectURL(url)
-        const maxDim = 1280
         const scale = Math.min(1, maxDim / Math.max(img.naturalWidth || 1, img.naturalHeight || 1))
         const w = Math.max(1, Math.round((img.naturalWidth || 320) * scale))
         const h = Math.max(1, Math.round((img.naturalHeight || 240) * scale))
@@ -136,27 +187,11 @@ export async function createWatermarkedCopy(
         const ctx = canvas.getContext('2d')
         if (!ctx) return resolve(null)
         ctx.drawImage(img, 0, 0, w, h)
-
-        const fontSize = Math.max(11, Math.min(18, Math.round(w / 42)))
-        const lineHeight = Math.round(fontSize * 1.38)
-        const padX = Math.max(10, Math.round(w * 0.02))
-        const padY = Math.max(8, Math.round(fontSize * 0.6))
-        const boxHeight = Math.min(h, padY * 2 + lines.length * lineHeight)
-
-        ctx.fillStyle = 'rgba(11, 37, 69, 0.78)'
-        ctx.fillRect(0, h - boxHeight, w, boxHeight)
-        ctx.fillStyle = '#FFFFFF'
-        ctx.font = `600 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`
-        ctx.textBaseline = 'top'
-        lines.forEach((line, i) => {
-          ctx.fillText(line, padX, h - boxHeight + padY + i * lineHeight, w - padX * 2)
-        })
-
-        const outType = originalBlob.type === 'image/png' ? 'image/png' : 'image/jpeg'
+        drawWatermarkOverlay(ctx, w, h, lines)
         canvas.toBlob(
           (blob) => resolve(blob && blob.size > 0 ? blob : null),
           outType,
-          outType === 'image/jpeg' ? 0.88 : undefined,
+          quality,
         )
       } catch {
         resolve(null)
