@@ -9,9 +9,9 @@ import { RAIN_THRESHOLD_WASPADA_MM, WATER_LEVEL_THRESHOLD_BAHAYA_M, STATUS_CONFI
 const ICONS = { 'check-circle': CheckCircle, 'alert-triangle': AlertTriangle, 'alert-circle': AlertCircle,
   'help-circle': HelpCircle, clock: Clock }
 
-export default function FloodStatusPanel({ data, loading, error, offline = false, refresh, showScanCta = true }: {
+export default function FloodStatusPanel({ data, loading, error, offline = false, refresh, showScanCta = true, hideUnsupportedHydrology = false }: {
   data: FloodAssessment | null; loading: boolean; error: string | null; offline?: boolean
-  refresh: (simulation?: boolean) => void; showScanCta?: boolean
+  refresh: (simulation?: boolean) => void; showScanCta?: boolean; hideUnsupportedHydrology?: boolean
 }) {
   if (loading) return <div className="rounded-2xl bg-slate-100 p-6 sm:p-8 text-slate-700" role="status" aria-live="polite">
     <p className="font-semibold">Memperbarui indikator banjir…</p>
@@ -22,12 +22,15 @@ export default function FloodStatusPanel({ data, loading, error, offline = false
   const style = data?.simulation ? STATUS_CONFIG.unknown : STATUS_CONFIG[status]
   const Icon = data ? ICONS[data.icon] : HelpCircle
   const coords = data?.sources.weather.context.coordinates
-  const indicators = data ? [
+  const allIndicators = data ? [
     { label: 'Prakiraan hujan · periode 3 jam', source: data.sources.weather, icon: CloudRain,
       warn: data.sources.weather.quality === 'VALID' && data.sources.weather.value! >= RAIN_THRESHOLD_WASPADA_MM },
     { label: 'Laporan tinggi air', source: data.sources.water, icon: Droplets,
       warn: data.sources.water.quality === 'VALID' && data.sources.water.value! >= WATER_LEVEL_THRESHOLD_BAHAYA_M },
   ] : []
+  const indicators = hideUnsupportedHydrology && !data?.simulation
+    ? allIndicators.filter((item) => item.source.quality === 'VALID')
+    : allIndicators
   return <section className={`rounded-2xl ${style.bannerClass} text-white p-5 sm:p-8 shadow-lg`}
     aria-label="Indikator peringatan dini banjir" data-assessment-context={data?.context_id} data-risk-status={status}>
     <div className="flex items-center gap-4" aria-live="polite">

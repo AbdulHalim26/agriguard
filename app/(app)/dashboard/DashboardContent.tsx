@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ShieldCheck, Map, Printer, History } from 'lucide-react'
 import SyncWidget from '@/components/features/SyncWidget'
+import BmkgWeatherCard from '@/components/features/BmkgWeatherCard'
 import DashboardHero from './DashboardHero'
 import LahanSummary from './LahanSummary'
 import NotifikasiWidget from './NotifikasiWidget'
@@ -109,8 +110,11 @@ export default function DashboardContent({ userName, userId, demoMode, role }: D
 
   return (
     <div className="space-y-6">
-      {/* Hero status banjir + CTA scan (FR-01 / FR-02) */}
-      <DashboardHero userName={userName} />
+      {/* Prakiraan cuaca resmi BMKG sesuai lokasi petani (terpisah dari risiko banjir) */}
+      <BmkgWeatherCard showFarmerActions={true} />
+
+      {/* Indikator risiko banjir terpisah (tanpa angka hidrologi yang belum didukung data nyata) */}
+      <DashboardHero userName={userName} hideUnsupportedHydrology={true} />
 
       {/* Widget antrian offline (FR-03) */}
       <SyncWidget userId={userId} />
